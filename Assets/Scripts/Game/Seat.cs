@@ -32,6 +32,7 @@ public class Seat : MonoBehaviour
     [Header("Pelea de carreras")]
     public bool fightActive;
     public float fightTimer;
+    public float fightStartTime;
 
     [Header("Grupo exclusivo de carrera")]
     public bool exclusive;

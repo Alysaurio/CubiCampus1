@@ -52,6 +52,8 @@ public class GameManager : MonoBehaviour
     public float effLossFight = 10f;
     [Tooltip("Si siguen juntos, vuelven a pelearse cada X segundos y se repite la perdida.")]
     public float fightRepeatSeconds = 10f;
+    [Tooltip("Segundos que tardan los alumnos peleandose en irse (empaquetar y salir).")]
+    public float fightLeaveSeconds = 3f;
 
     [Header("Cargadores")]
     [Tooltip("Eficiencia que se pierde cuando un alumno con bateria baja se sienta sin enchufe.")]
@@ -555,6 +557,32 @@ public class GameManager : MonoBehaviour
                    "  -" + Mathf.RoundToInt(effLossFight) + "% eficiencia", 2.4f);
     }
 
+    /// <summary>
+    /// Hace que los alumnos que estan peleando empiecen a empaquetar y se vayan.
+    /// Se llama cuando superan fightLeaveSeconds peleandose.
+    /// </summary>
+    void MakeFightingStudentsLeave(Seat seat)
+    {
+        if (seat == null) return;
+
+        for (int i = 0; i < seat.occupants.Count; i++)
+        {
+            Student st = seat.occupants[i];
+            if (st == null) continue;
+            // Solo los que esten sentados/listos (no los que ya se van).
+            if (st.state == StudentState.Seated || st.state == StudentState.Ready)
+            {
+                st.BeginPacking();
+                // Simula clics para que se vayan rapido.
+                st.PackClick();
+                st.PackClick();
+                st.PackClick();
+            }
+        }
+
+        SetMessage("PELEA mesa " + seat.seatId + ": alumnos se van tras " + Mathf.RoundToInt(fightLeaveSeconds) + "s", 2f);
+    }
+
     void UpdateCareerConflicts(float dt)
     {
         for (int i = 0; i < seats.Count; i++)
@@ -568,13 +596,22 @@ public class GameManager : MonoBehaviour
                 {
                     s.fightActive = true;
                     s.fightTimer = fightRepeatSeconds;
+                    s.fightStartTime = Time.time;
                     s.SetFighting(true);
                     RegisterCareerFight(s);
                 }
                 else
                 {
                     s.fightTimer -= dt;
-                    if (s.fightTimer <= 0f)
+
+                    // Si llevan peleando mas de fightLeaveSeconds, se van (empaquetan y salen).
+                    if (Time.time - s.fightStartTime >= fightLeaveSeconds)
+                    {
+                        MakeFightingStudentsLeave(s);
+                        s.fightActive = false;
+                        s.SetFighting(false);
+                    }
+                    else if (s.fightTimer <= 0f)
                     {
                         s.fightTimer = fightRepeatSeconds;
                         RegisterCareerFight(s);

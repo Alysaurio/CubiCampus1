@@ -248,6 +248,11 @@ public static class RoomLayout
         new[] { new Vector2Int(0, 1), new Vector2Int(1, 0), new Vector2Int(1, 1) },
     };
 
+    // Formas usadas en los ultimos niveles/reintentos. Sirve para que dos niveles
+    // seguidos no generen el mismo tipo de grupo (la variedad se nota al reiniciar).
+    static readonly List<int> recentShapeIndices = new List<int>();
+    const int RecentShapeMemory = 4;
+
     public static void ConfigureLevel(GameManager game, DayConfig cfg)
     {
         if (game == null || game.seats == null || game.seats.Count == 0) return;
@@ -263,8 +268,9 @@ public static class RoomLayout
             s.SetOutlet((s.seatId % 3) == 1);
         }
 
-        // 1 grupo en los primeros dias, hasta 3 grupos con las 24 mesas.
-        int groups = Mathf.Clamp(Mathf.CeilToInt(active / 10f), 1, 3);
+        // Desde el primer dia hay al menos 2 grupos para que se note la variedad;
+        // en los dias con mas mesas se llega a 3 grupos.
+        int groups = Mathf.Clamp(Mathf.CeilToInt(active / 7f), 1, 3);
 
         List<Career> careers = new List<Career>(StudentProfile.AllCareers);
         for (int i = careers.Count - 1; i > 0; i--)
@@ -275,15 +281,36 @@ public static class RoomLayout
             careers[j] = tmp;
         }
 
+        // Orden de formas para este nivel: primero las que NO se usaron en los
+        // ultimos niveles, para que un reintento nunca repita el grupo anterior.
+        List<int> shapeOrder = new List<int>();
+        List<int> recentShapes = new List<int>();
+        for (int i = 0; i < GroupShapes.Length; i++)
+        {
+            if (recentShapeIndices.Contains(i))
+                recentShapes.Add(i);
+            else
+                shapeOrder.Add(i);
+        }
+        Shuffle(shapeOrder);
+        Shuffle(recentShapes);
+        shapeOrder.AddRange(recentShapes);
+
         // Mapa de celdas basado en la posicion real de las mesas: si el disenador
         // las reacomoda en el editor, los grupos siguen siendo contiguos.
         int rows, cols;
         Dictionary<int, int> cells = BuildCellMap(game, active, out rows, out cols);
         List<int> used = new List<int>();
 
+        // Formas y tamanos ya usados en este nivel: ningun grupo puede repetir
+        // forma ni cantidad de mesas si hay alternativas disponibles.
+        List<int> usedShapeIndices = new List<int>();
+        List<int> usedSizes = new List<int>();
+
         for (int g = 0; g < groups; g++)
         {
-            List<int> group = PickGroupCells(cells, rows, cols, used);
+            List<int> group = PickGroupCells(cells, rows, cols, used, shapeOrder,
+                                             usedShapeIndices, usedSizes);
             if (group == null) break;
 
             Career career = careers[g % careers.Count];
@@ -297,6 +324,27 @@ public static class RoomLayout
             // El grupo siempre tiene al menos un enchufe para su carrera.
             Seat outlet = game.seats[group[Random.Range(0, group.Count)]];
             if (outlet != null) outlet.SetOutlet(true);
+        }
+
+        // Guarda las formas de este nivel para evitar repetirlas en el siguiente.
+        for (int i = 0; i < usedShapeIndices.Count; i++)
+        {
+            int shape = usedShapeIndices[i];
+            recentShapeIndices.Remove(shape);
+            recentShapeIndices.Add(shape);
+        }
+        while (recentShapeIndices.Count > RecentShapeMemory)
+            recentShapeIndices.RemoveAt(0);
+    }
+
+    static void Shuffle(List<int> list)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            int tmp = list[i];
+            list[i] = list[j];
+            list[j] = tmp;
         }
     }
 
@@ -368,23 +416,39 @@ public static class RoomLayout
         return -1;
     }
 
-    static List<int> PickGroupCells(Dictionary<int, int> cells, int rows, int cols, List<int> used)
+    static List<int> PickGroupCells(Dictionary<int, int> cells, int rows, int cols, List<int> used,
+                                    List<int> shapeOrder, List<int> usedShapeIndices,
+                                    List<int> usedSizes)
     {
-        // Baraja las formas para que cada nivel/reintento elija una distinta.
-        List<Vector2Int[]> order = new List<Vector2Int[]>(GroupShapes);
-        for (int i = order.Count - 1; i > 0; i--)
+        // 1) Forma libre en el nivel y con tamano distinto a los grupos ya creados.
+        for (int i = 0; i < shapeOrder.Count; i++)
         {
-            int j = Random.Range(0, i + 1);
-            Vector2Int[] tmp = order[i];
-            order[i] = order[j];
-            order[j] = tmp;
+            int shapeIdx = shapeOrder[i];
+            if (usedShapeIndices.Contains(shapeIdx)) continue;
+
+            int size = GroupShapes[shapeIdx].Length;
+            if (usedSizes.Contains(size)) continue;
+
+            List<List<int>> candidates = ShapeCandidates(GroupShapes[shapeIdx], cells, rows, cols, used);
+            if (candidates.Count == 0) continue;
+
+            usedShapeIndices.Add(shapeIdx);
+            usedSizes.Add(size);
+            return candidates[Random.Range(0, candidates.Count)];
         }
 
-        for (int i = 0; i < order.Count; i++)
+        // 2) Si no queda un tamano distinto, cualquier forma que no se haya usado.
+        for (int i = 0; i < shapeOrder.Count; i++)
         {
-            List<List<int>> candidates = ShapeCandidates(order[i], cells, rows, cols, used);
-            if (candidates.Count > 0)
-                return candidates[Random.Range(0, candidates.Count)];
+            int shapeIdx = shapeOrder[i];
+            if (usedShapeIndices.Contains(shapeIdx)) continue;
+
+            List<List<int>> candidates = ShapeCandidates(GroupShapes[shapeIdx], cells, rows, cols, used);
+            if (candidates.Count == 0) continue;
+
+            usedShapeIndices.Add(shapeIdx);
+            usedSizes.Add(GroupShapes[shapeIdx].Length);
+            return candidates[Random.Range(0, candidates.Count)];
         }
 
         return null;
