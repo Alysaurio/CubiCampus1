@@ -69,7 +69,7 @@ public class TutorialDia1 : MonoBehaviour
             MoverBotonesDebajo();
             if (txtNombreNPC != null) txtNombreNPC.text = "JEFE DE CAMPUS";
             if (txtDialogo != null) txtDialogo.text = "Mueve posicionDialogo y posicionNPC en el Inspector";
-            if (txtContador != null) txtContador.text = "1 / 7";
+            if (txtContador != null) txtContador.text = "1 / 8";
             if (rtDialogo != null) rtDialogo.anchoredPosition = posicionDialogo;
             if (rtAvatar != null) rtAvatar.anchoredPosition = posicionNPC;
             return;
@@ -181,15 +181,15 @@ public class TutorialDia1 : MonoBehaviour
         rtDialogo.anchorMin = new Vector2(0f, 0f);
         rtDialogo.anchorMax = new Vector2(0f, 0f);
         rtDialogo.pivot = new Vector2(0f, 0f);
-        rtDialogo.sizeDelta = new Vector2(680, 190);
+        rtDialogo.sizeDelta = new Vector2(820, 250);
         rtDialogo.anchoredPosition = posicionDialogo;
         Image imgDialogo = panelDialogo.AddComponent<Image>();
         imgDialogo.color = new Color(0.98f, 0.99f, 1f, 1f);
         // Borde
-        CrearRect(panelDialogo.transform, new Vector2(0, 93), new Vector2(680, 4), new Color(0.15f, 0.18f, 0.25f));
-        CrearRect(panelDialogo.transform, new Vector2(0, -93), new Vector2(680, 4), new Color(0.15f, 0.18f, 0.25f));
-        CrearRect(panelDialogo.transform, new Vector2(-338, 0), new Vector2(4, 190), new Color(0.15f, 0.18f, 0.25f));
-        CrearRect(panelDialogo.transform, new Vector2(338, 0), new Vector2(4, 190), new Color(0.15f, 0.18f, 0.25f));
+        CrearRect(panelDialogo.transform, new Vector2(0, 123), new Vector2(820, 4), new Color(0.15f, 0.18f, 0.25f));
+        CrearRect(panelDialogo.transform, new Vector2(0, -123), new Vector2(820, 4), new Color(0.15f, 0.18f, 0.25f));
+        CrearRect(panelDialogo.transform, new Vector2(-408, 0), new Vector2(4, 250), new Color(0.15f, 0.18f, 0.25f));
+        CrearRect(panelDialogo.transform, new Vector2(408, 0), new Vector2(4, 250), new Color(0.15f, 0.18f, 0.25f));
         // Pico de la nube
         GameObject pico = new GameObject("Pico");
         pico.transform.SetParent(panelDialogo.transform, false);
@@ -247,8 +247,8 @@ public class TutorialDia1 : MonoBehaviour
         RectTransform rtDlg = goDialogo.AddComponent<RectTransform>();
         rtDlg.anchorMin = new Vector2(0f, 0f);
         rtDlg.anchorMax = new Vector2(1f, 1f);
-        rtDlg.offsetMin = new Vector2(25, 40);
-        rtDlg.offsetMax = new Vector2(-25, -50);
+        rtDlg.offsetMin = new Vector2(28, 50);
+        rtDlg.offsetMax = new Vector2(-28, -54);
         txtDialogo = goDialogo.AddComponent<Text>();
         txtDialogo.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         txtDialogo.fontSize = 22;
@@ -257,6 +257,10 @@ public class TutorialDia1 : MonoBehaviour
         txtDialogo.horizontalOverflow = HorizontalWrapMode.Wrap;
         txtDialogo.verticalOverflow = VerticalWrapMode.Truncate;
         txtDialogo.lineSpacing = 1.1f;
+        // Ajusta el tamano para que TODO el texto quepa sin salirse de la nube.
+        txtDialogo.resizeTextForBestFit = true;
+        txtDialogo.resizeTextMinSize = 15;
+        txtDialogo.resizeTextMaxSize = 22;
         
         // Contador
         GameObject goCont = new GameObject("TxtContador");

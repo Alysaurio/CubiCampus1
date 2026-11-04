@@ -245,7 +245,11 @@ public class DragAssigner : MonoBehaviour
         Seat[] all = Object.FindObjectsOfType<Seat>(true);
         for (int i = 0; i < all.Length; i++)
         {
-            if (all[i] != null) all[i].ClearDragHighlight();
+            if (all[i] == null) continue;
+            // Quita tanto el borde de arrastre como el resaltado de compatibilidad:
+            // si solo se ocultaba el primero, la mesa quedaba "encendida" al soltar.
+            all[i].ClearDragHighlight();
+            all[i].SetHighlight(0);
         }
         hoverSeat = null;
     }

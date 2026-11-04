@@ -13,20 +13,23 @@ public static class RoomLayout
     public const int TablesPerRow = 6;
     public const int TotalRows = 4;
 
-    const float TableWidth = 2.6f;
-    const float TableHeight = 1.25f;
-    const float ColumnStep = 2.85f;
+    const float TableWidth = 2.75f;
+    const float TableHeight = 1.45f;
+    const float ColumnStep = 2.86f;
     const float RowStep = 1.8f;
-    const float GridStartX = -5.45f;
-    const float GridStartY = 3.0f;
+    const float GridStartX = -5.53f;
+    const float GridStartY = 3.02f;
 
     public static void Apply(GameManager game)
     {
         if (game == null) return;
 
         ResizeRoom();
-        EnsureSeats(game);
-        PositionSeats(game);
+
+        // Si la escena ya trae las 24 mesas con el tamano correcto, respetamos
+        // las posiciones guardadas para que se puedan reacomodar desde el editor.
+        if (EnsureSeats(game)) PositionSeats(game);
+
         EnsureQueueSlots(game);
         PositionQueue(game);
         EnsureTeacherArea();
@@ -81,7 +84,11 @@ public static class RoomLayout
 
     // ------------------------------------------------------------------ mesas
 
-    static void EnsureSeats(GameManager game)
+    /// <summary>
+    /// Devuelve true si tuvo que reconstruir las mesas (escena antigua o tamano
+    /// desactualizado). En ese caso hay que recolocarlas en la cuadricula.
+    /// </summary>
+    static bool EnsureSeats(GameManager game)
     {
         if (game.seats == null) game.seats = new List<Seat>();
 
@@ -101,7 +108,7 @@ public static class RoomLayout
             }
         }
 
-        if (complete) return;
+        if (complete) return false;
 
         // La escena antigua solo tenia 8 puestos: se retiran y se construyen
         // las 24 mesas dobles nuevas.
@@ -121,6 +128,8 @@ public static class RoomLayout
             Seat seat = CreateTable(i + 1, room);
             game.seats.Add(seat);
         }
+
+        return true;
     }
 
     static Seat CreateTable(int id, Transform parent)
@@ -134,7 +143,7 @@ public static class RoomLayout
         seat.capacity = TableCapacity;
         seat.hasOutlet = false;
         seat.size = new Vector2(TableWidth, TableHeight);
-        seat.scrubDistance = 2f;
+        seat.scrubDistance = 2.2f;
 
         BoxCollider2D col = go.AddComponent<BoxCollider2D>();
         col.size = seat.size;
@@ -221,10 +230,24 @@ public static class RoomLayout
     // ------------------------------------------------------------------ variacion por nivel
 
     /// <summary>
-    /// Distribuye enchufes y elige pequenos grupos exclusivos de una carrera.
-    /// Se llama al aplicar la configuracion del dia; como la escena se recarga
-    /// en cada reintento, la seleccion cambia en cada nivel y cada reintento.
+    /// Formas posibles de los grupos exclusivos. Cada Vector2Int es un
+    /// desplazamiento (fila, columna): asi alternan tiradas horizontales,
+    /// verticales, bloques 2x2 y formas en L.
     /// </summary>
+    static readonly Vector2Int[][] GroupShapes =
+    {
+        new[] { new Vector2Int(0, 0), new Vector2Int(0, 1) },
+        new[] { new Vector2Int(0, 0), new Vector2Int(0, 1), new Vector2Int(0, 2) },
+        new[] { new Vector2Int(0, 0), new Vector2Int(0, 1), new Vector2Int(0, 2), new Vector2Int(0, 3) },
+        new[] { new Vector2Int(0, 0), new Vector2Int(1, 0) },
+        new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(2, 0) },
+        new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(2, 0), new Vector2Int(3, 0) },
+        new[] { new Vector2Int(0, 0), new Vector2Int(0, 1), new Vector2Int(1, 0), new Vector2Int(1, 1) },
+        new[] { new Vector2Int(0, 0), new Vector2Int(0, 1), new Vector2Int(1, 0) },
+        new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(1, 1) },
+        new[] { new Vector2Int(0, 1), new Vector2Int(1, 0), new Vector2Int(1, 1) },
+    };
+
     public static void ConfigureLevel(GameManager game, DayConfig cfg)
     {
         if (game == null || game.seats == null || game.seats.Count == 0) return;
@@ -252,52 +275,160 @@ public static class RoomLayout
             careers[j] = tmp;
         }
 
+        // Mapa de celdas basado en la posicion real de las mesas: si el disenador
+        // las reacomoda en el editor, los grupos siguen siendo contiguos.
+        int rows, cols;
+        Dictionary<int, int> cells = BuildCellMap(game, active, out rows, out cols);
         List<int> used = new List<int>();
 
         for (int g = 0; g < groups; g++)
         {
-            int size = Random.Range(2, 4); // 2 o 3 mesas
-            int start = FindGroupStart(active, size, used);
-            if (start < 0 && size > 2)
-            {
-                size = 2;
-                start = FindGroupStart(active, size, used);
-            }
-            if (start < 0) break;
+            List<int> group = PickGroupCells(cells, rows, cols, used);
+            if (group == null) break;
 
             Career career = careers[g % careers.Count];
-            for (int k = 0; k < size; k++)
+            for (int k = 0; k < group.Count; k++)
             {
-                Seat s = game.seats[start + k];
+                Seat s = game.seats[group[k]];
                 if (s != null) s.SetCareerGroup(true, career);
-                used.Add(start + k);
+                used.Add(group[k]);
             }
 
             // El grupo siempre tiene al menos un enchufe para su carrera.
-            Seat middle = game.seats[start + size / 2];
-            if (middle != null) middle.SetOutlet(true);
+            Seat outlet = game.seats[group[Random.Range(0, group.Count)]];
+            if (outlet != null) outlet.SetOutlet(true);
         }
     }
 
-    static int FindGroupStart(int active, int size, List<int> used)
+    /// <summary>
+    /// Construye un mapa (fila, columna) -> indice de mesa usando las posiciones
+    /// reales. Asi funciona igual con la cuadricula original o si se mueven las
+    /// mesas manualmente en el editor.
+    /// </summary>
+    static Dictionary<int, int> BuildCellMap(GameManager game, int active, out int rows, out int cols)
     {
-        List<int> candidates = new List<int>();
+        const float TolX = 0.55f;
+        const float TolY = 0.45f;
 
-        for (int i = 0; i + size - 1 < active; i++)
+        List<float> xs = new List<float>();
+        List<float> ys = new List<float>();
+
+        for (int i = 0; i < game.seats.Count && i < active; i++)
         {
-            int row = i / TablesPerRow;
-            if ((i + size - 1) / TablesPerRow != row) continue;
-
-            bool free = true;
-            for (int k = 0; k < size; k++)
-            {
-                if (used.Contains(i + k)) { free = false; break; }
-            }
-            if (free) candidates.Add(i);
+            Seat s = game.seats[i];
+            if (s == null) continue;
+            xs.Add(s.transform.position.x);
+            ys.Add(s.transform.position.y);
         }
 
-        if (candidates.Count == 0) return -1;
-        return candidates[Random.Range(0, candidates.Count)];
+        List<float> uniqueX = UniqueSorted(xs, TolX, false);
+        List<float> uniqueY = UniqueSorted(ys, TolY, true);
+
+        cols = Mathf.Max(1, uniqueX.Count);
+        rows = Mathf.Max(1, uniqueY.Count);
+
+        Dictionary<int, int> cells = new Dictionary<int, int>();
+
+        for (int i = 0; i < game.seats.Count && i < active; i++)
+        {
+            Seat s = game.seats[i];
+            if (s == null) continue;
+
+            int col = RankOf(uniqueX, s.transform.position.x, TolX);
+            int row = RankOf(uniqueY, s.transform.position.y, TolY);
+            if (col < 0 || row < 0) continue;
+
+            int key = row * cols + col;
+            if (!cells.ContainsKey(key)) cells.Add(key, i);
+        }
+
+        return cells;
+    }
+
+    static List<float> UniqueSorted(List<float> values, float tolerance, bool descending)
+    {
+        values.Sort();
+        if (descending) values.Reverse();
+
+        List<float> unique = new List<float>();
+        for (int i = 0; i < values.Count; i++)
+        {
+            if (unique.Count == 0 || Mathf.Abs(unique[unique.Count - 1] - values[i]) > tolerance)
+                unique.Add(values[i]);
+        }
+        return unique;
+    }
+
+    static int RankOf(List<float> unique, float value, float tolerance)
+    {
+        for (int i = 0; i < unique.Count; i++)
+        {
+            if (Mathf.Abs(unique[i] - value) <= tolerance) return i;
+        }
+        return -1;
+    }
+
+    static List<int> PickGroupCells(Dictionary<int, int> cells, int rows, int cols, List<int> used)
+    {
+        // Baraja las formas para que cada nivel/reintento elija una distinta.
+        List<Vector2Int[]> order = new List<Vector2Int[]>(GroupShapes);
+        for (int i = order.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            Vector2Int[] tmp = order[i];
+            order[i] = order[j];
+            order[j] = tmp;
+        }
+
+        for (int i = 0; i < order.Count; i++)
+        {
+            List<List<int>> candidates = ShapeCandidates(order[i], cells, rows, cols, used);
+            if (candidates.Count > 0)
+                return candidates[Random.Range(0, candidates.Count)];
+        }
+
+        return null;
+    }
+
+    static List<List<int>> ShapeCandidates(Vector2Int[] shape, Dictionary<int, int> cells,
+                                           int rows, int cols, List<int> used)
+    {
+        int maxRow = 0;
+        int maxCol = 0;
+        for (int i = 0; i < shape.Length; i++)
+        {
+            if (shape[i].x > maxRow) maxRow = shape[i].x;
+            if (shape[i].y > maxCol) maxCol = shape[i].y;
+        }
+
+        List<List<int>> result = new List<List<int>>();
+
+        for (int r = 0; r + maxRow < rows; r++)
+        {
+            for (int c = 0; c + maxCol < cols; c++)
+            {
+                List<int> group = new List<int>(shape.Length);
+                bool ok = true;
+
+                for (int i = 0; i < shape.Length; i++)
+                {
+                    int key = (r + shape[i].x) * cols + (c + shape[i].y);
+                    int seatIndex;
+
+                    if (!cells.TryGetValue(key, out seatIndex) || used.Contains(seatIndex))
+                    {
+                        ok = false;
+                        break;
+                    }
+
+                    group.Add(seatIndex);
+                }
+
+                if (ok) result.Add(group);
+            }
+        }
+
+        return result;
     }
 
     // ------------------------------------------------------------------ profesor
@@ -312,8 +443,8 @@ public static class RoomLayout
             sr.sprite = PixelFactory.White;
             sr.color = new Color(0.36f, 0.24f, 0.14f);
             sr.sortingOrder = 2;
-            desk.transform.position = new Vector3(3.6f, -4.08f, 0f);
-            desk.transform.localScale = new Vector3(2.6f, 1.0f, 1f);
+            desk.transform.position = new Vector3(3.6f, -4.13f, 0f);
+            desk.transform.localScale = new Vector3(2.75f, 1.0f, 1f);
         }
 
         GameObject teacher = GameObject.Find("Profesor");
@@ -324,7 +455,7 @@ public static class RoomLayout
             sr.sprite = PixelFactory.White;
             sr.color = new Color(0.25f, 0.55f, 0.85f);
             sr.sortingOrder = 14;
-            teacher.transform.position = new Vector3(3.6f, -3.55f, 0f);
+            teacher.transform.position = new Vector3(3.6f, -3.62f, 0f);
             teacher.transform.localScale = new Vector3(0.7f, 0.7f, 1f);
         }
     }
