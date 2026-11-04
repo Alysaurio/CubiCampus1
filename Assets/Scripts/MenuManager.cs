@@ -8,6 +8,7 @@ public class MenuManager : MonoBehaviour
 {
     [Header("Referencias UI")]
     public Button btnJugar;
+    public Button btnNuevaPartida;
     public Button btnMarcadores;
     public Button btnOpciones;
     public Button btnSalir;
@@ -80,6 +81,7 @@ public class MenuManager : MonoBehaviour
         if (panelOpciones != null) panelOpciones.SetActive(false);
 
         if (btnJugar != null) btnJugar.onClick.AddListener(OnJugarClick);
+        if (btnNuevaPartida != null) btnNuevaPartida.onClick.AddListener(OnNuevaPartidaClick);
         if (btnMarcadores != null) btnMarcadores.onClick.AddListener(OnMarcadoresClick);
         if (btnOpciones != null) btnOpciones.onClick.AddListener(OnOpcionesClick);
         if (btnSalir != null) btnSalir.onClick.AddListener(OnSalirClick);
@@ -191,6 +193,7 @@ public class MenuManager : MonoBehaviour
     void ResolverReferencias()
     {
         if (btnJugar == null) btnJugar = BuscarBoton("BtnJugar");
+        if (btnNuevaPartida == null) btnNuevaPartida = BuscarBoton("BtnNuevaPartida");
         if (btnMarcadores == null) btnMarcadores = BuscarBoton("BtnMarcadores");
         if (btnOpciones == null) btnOpciones = BuscarBoton("BtnOpciones");
         if (btnSalir == null) btnSalir = BuscarBoton("BtnSalir");
@@ -609,6 +612,26 @@ public class MenuManager : MonoBehaviour
         AudioManager.Play(Sfx.UiClick, 0.8f, 0.9f);
         if (panelMarcadores != null) panelMarcadores.SetActive(false);
         if (panelOpciones != null) panelOpciones.SetActive(false);
+    }
+
+    void OnNuevaPartidaClick()
+    {
+        if (campoNombre != null) campoNombre.SoltarFoco();
+
+        AudioManager.Play(Sfx.UiClick, 0.9f, 1.05f);
+
+        // Reiniciar progreso de la campana al dia 1.
+        DayProgression.Reiniciar();
+
+        // Volver a habilitar el tutorial para que se muestre en el nuevo dia 1.
+        PlayerPrefs.SetInt(TutorialDia1.PrefKey, 0);
+        PlayerPrefs.SetInt("MostrarTutorial", 1);
+        PlayerPrefs.Save();
+
+        // Cargar el juego desde el dia 1.
+        PlayerPrefs.SetString("EscenaDestino", sceneJuego);
+        PlayerPrefs.Save();
+        SceneManager.LoadScene(sceneCarga);
     }
 
     public void SetVolumen(float value)

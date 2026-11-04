@@ -18,6 +18,7 @@ public static class CubiMenuBuilder
     static readonly Color ColFondo      = new Color(0.09f, 0.09f, 0.14f, 1f);
     static readonly Color ColBoton      = new Color(0.20f, 0.55f, 0.95f, 1f);
     static readonly Color ColBotonRojo  = new Color(0.85f, 0.28f, 0.28f, 1f);
+    static readonly Color ColOro        = new Color(1f, 0.84f, 0.35f, 1f);
     static readonly Color ColPanel      = new Color(0.10f, 0.10f, 0.16f, 0.98f);
     static readonly Color ColOverlay    = new Color(0f, 0f, 0f, 0.65f);
     static readonly Color ColTexto      = new Color(0.95f, 0.95f, 0.98f, 1f);
@@ -116,9 +117,10 @@ public static class CubiMenuBuilder
 
         // --- Botones principales ---
         Button btnJugar      = MakeButton(canvasT, "BtnJugar", "JUGAR  -  DIA 1", ColBoton, new Vector2(0f, 26f), new Vector2(440f, 80f), 30);
-        Button btnMarcadores = MakeButton(canvasT, "BtnMarcadores", "MARCADORES", ColBoton, new Vector2(0f, -76f), new Vector2(440f, 80f), 32);
-        Button btnOpciones   = MakeButton(canvasT, "BtnOpciones", "OPCIONES", ColBoton, new Vector2(0f, -178f), new Vector2(440f, 80f), 32);
-        Button btnSalir      = MakeButton(canvasT, "BtnSalir", "SALIR", ColBotonRojo, new Vector2(0f, -280f), new Vector2(440f, 80f), 32);
+        Button btnNuevaPartida = MakeButton(canvasT, "BtnNuevaPartida", "CREAR NUEVA PARTIDA", ColOro, new Vector2(0f, -62f), new Vector2(440f, 80f), 28);
+        Button btnMarcadores = MakeButton(canvasT, "BtnMarcadores", "MARCADORES", ColBoton, new Vector2(0f, -150f), new Vector2(440f, 80f), 32);
+        Button btnOpciones   = MakeButton(canvasT, "BtnOpciones", "OPCIONES", ColBoton, new Vector2(0f, -252f), new Vector2(440f, 80f), 32);
+        Button btnSalir      = MakeButton(canvasT, "BtnSalir", "SALIR", ColBotonRojo, new Vector2(0f, -354f), new Vector2(440f, 80f), 32);
 
         // --- Panel Marcadores ---
         GameObject panelMarcadores = NewUI("PanelMarcadores", canvasT);
@@ -295,6 +297,7 @@ public static class CubiMenuBuilder
         GameObject mmGO = NewUI("MenuManagerGO", canvasT);
         MenuManager mm = mmGO.AddComponent<MenuManager>();
         mm.btnJugar = btnJugar;
+        mm.btnNuevaPartida = btnNuevaPartida;
         mm.btnMarcadores = btnMarcadores;
         mm.btnOpciones = btnOpciones;
         mm.btnSalir = btnSalir;

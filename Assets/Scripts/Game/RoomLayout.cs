@@ -246,12 +246,22 @@ public static class RoomLayout
         new[] { new Vector2Int(0, 0), new Vector2Int(0, 1), new Vector2Int(1, 0) },
         new[] { new Vector2Int(0, 0), new Vector2Int(1, 0), new Vector2Int(1, 1) },
         new[] { new Vector2Int(0, 1), new Vector2Int(1, 0), new Vector2Int(1, 1) },
+        new[] { new Vector2Int(0, 0) },
     };
+
+    // Tamano de grupo por nivel: empieza en 1 mesa y sube escalonado hasta 3.
+    // Niveles 1-3: 1 mesa | Niveles 4-7: 2 mesas | Niveles 8-10: 3 mesas.
+    static int TargetGroupSize(int dia)
+    {
+        if (dia <= 3) return 1;
+        if (dia <= 7) return 2;
+        return 3;
+    }
 
     // Formas usadas en los ultimos niveles/reintentos. Sirve para que dos niveles
     // seguidos no generen el mismo tipo de grupo (la variedad se nota al reiniciar).
     static readonly List<int> recentShapeIndices = new List<int>();
-    const int RecentShapeMemory = 4;
+    const int RecentShapeMemory = 8;
 
     public static void ConfigureLevel(GameManager game, DayConfig cfg)
     {
@@ -268,28 +278,37 @@ public static class RoomLayout
             s.SetOutlet((s.seatId % 3) == 1);
         }
 
-        // Limite proporcional: solo el 20% de las mesas activas puede formar grupos.
-        int maxGroupsByTables = Mathf.Max(1, Mathf.CeilToInt(active * 0.2f));
+        // Limite normal: solo el 20% de las mesas activas puede formar grupos.
+        // En el nivel 1 se crean entre 1 y 3 grupos pequenos de una sola mesa.
+        int maxGroupsByTables = Mathf.Max(1, Mathf.FloorToInt(active * 0.2f));
 
-        // Una carrera no puede tener mas de un grupo (dos a partir del nivel 5).
-        int groupsPerCareerMax = (game.diaActual >= 5) ? 2 : 1;
-        int maxGroupsByCareers = StudentProfile.AllCareers.Length * groupsPerCareerMax;
+        // Limite de grupos por carrera: 1 en los niveles 1-5 y 2 desde el 6.
+        int groupsPerCareerMax = (game.diaActual >= 6) ? 2 : 1;
+        int groups = Mathf.Min(maxGroupsByTables,
+                               StudentProfile.AllCareers.Length * groupsPerCareerMax);
 
-        int groups = Mathf.Min(maxGroupsByTables, maxGroupsByCareers);
+        if (game.diaActual <= 1)
+            groups = Random.Range(1, 4); // 1 a 3 grupos en el primer nivel.
 
-        // Mezcla las carreras para variar el orden de asignacion.
-        List<Career> careers = new List<Career>(StudentProfile.AllCareers);
-        for (int i = careers.Count - 1; i > 0; i--)
+        groups = Mathf.Clamp(groups, 1,
+                             Mathf.Min(active, StudentProfile.AllCareers.Length * groupsPerCareerMax));
+
+        // Tamano de las mesas que forman cada grupo segun el nivel.
+        int targetGroupSize = TargetGroupSize(game.diaActual);
+
+        // Plan de carreras para este nivel. Se asignan una por una sin repetir:
+        // primero una ronda con todas las carreras mezcladas y, solo si hiciera
+        // falta (nivel 6+ con mas grupos que carreras), una segunda ronda.
+        // Con 6 carreras y un maximo de 4 grupos, siempre salen distintas.
+        List<Career> careerPlan = new List<Career>();
+        for (int round = 0; round < groupsPerCareerMax && careerPlan.Count < groups; round++)
         {
-            int j = Random.Range(0, i + 1);
-            Career tmp = careers[i];
-            careers[i] = careers[j];
-            careers[j] = tmp;
-        }
+            List<Career> roundCareers = new List<Career>(StudentProfile.AllCareers);
+            Shuffle(roundCareers);
 
-        // Contador de grupos asignados por carrera (para no repetir carrera).
-        int[] careerGroupCount = new int[StudentProfile.AllCareers.Length];
-        int careerIdx = 0;
+            for (int i = 0; i < roundCareers.Count && careerPlan.Count < groups; i++)
+                careerPlan.Add(roundCareers[i]);
+        }
 
         // Orden de formas para este nivel: primero las que NO se usaron en los
         // ultimos niveles, para que un reintento nunca repita el grupo anterior.
@@ -312,37 +331,23 @@ public static class RoomLayout
         Dictionary<int, int> cells = BuildCellMap(game, active, out rows, out cols);
         List<int> used = new List<int>();
 
-        // Formas y tamanos ya usados en este nivel: ningun grupo puede repetir
-        // forma ni cantidad de mesas si hay alternativas disponibles.
+        // Formas ya usadas en este nivel: ningun grupo puede repetir la misma
+        // forma (disposicion de mesas) dentro del mismo nivel.
         List<int> usedShapeIndices = new List<int>();
-        List<int> usedSizes = new List<int>();
 
-        for (int g = 0; g < groups; g++)
+        for (int g = 0; g < groups && g < careerPlan.Count; g++)
         {
-            // Busca la siguiente carrera que no haya alcanzado su limite de grupos.
-            Career career = Career.MecatronicaIndustrial;
-            int chosenCareerIdx = -1;
-            for (int attempt = 0; attempt < careers.Count; attempt++)
-            {
-                int ci = (careerIdx + attempt) % careers.Count;
-                Career c = careers[ci];
-                int careerIndex = (int)c;
-                if (careerGroupCount[careerIndex] < groupsPerCareerMax)
-                {
-                    career = c;
-                    chosenCareerIdx = ci;
-                    careerIdx = (ci + 1) % careers.Count;
-                    break;
-                }
-            }
-            if (chosenCareerIdx < 0) break; // Ninguna carrera disponible.
+            // Cada grupo usa una carrera distinta del plan del nivel.
+            Career career = careerPlan[g];
 
             List<int> group = PickGroupCells(cells, rows, cols, used, shapeOrder,
-                                             usedShapeIndices, usedSizes);
-            if (group == null) break;
-
-            // Marcar la carrera como usada solo si el grupo se creo.
-            careerGroupCount[(int)career]++;
+                                             usedShapeIndices, targetGroupSize);
+            if (group == null)
+            {
+                // Sin espacio para otra forma: el nivel se queda con los grupos
+                // ya creados (nunca se repite una carrera para rellenar).
+                break;
+            }
 
             for (int k = 0; k < group.Count; k++)
             {
@@ -367,12 +372,12 @@ public static class RoomLayout
             recentShapeIndices.RemoveAt(0);
     }
 
-    static void Shuffle(List<int> list)
+    static void Shuffle<T>(List<T> list)
     {
         for (int i = list.Count - 1; i > 0; i--)
         {
             int j = Random.Range(0, i + 1);
-            int tmp = list[i];
+            T tmp = list[i];
             list[i] = list[j];
             list[j] = tmp;
         }
@@ -448,36 +453,34 @@ public static class RoomLayout
 
     static List<int> PickGroupCells(Dictionary<int, int> cells, int rows, int cols, List<int> used,
                                     List<int> shapeOrder, List<int> usedShapeIndices,
-                                    List<int> usedSizes)
+                                    int targetSize)
     {
-        // 1) Forma libre en el nivel y con tamano distinto a los grupos ya creados.
+        // 1) Formas del tamano del nivel que aun NO se usaron en este nivel.
         for (int i = 0; i < shapeOrder.Count; i++)
         {
             int shapeIdx = shapeOrder[i];
+            if (GroupShapes[shapeIdx].Length != targetSize) continue;
             if (usedShapeIndices.Contains(shapeIdx)) continue;
-
-            int size = GroupShapes[shapeIdx].Length;
-            if (usedSizes.Contains(size)) continue;
 
             List<List<int>> candidates = ShapeCandidates(GroupShapes[shapeIdx], cells, rows, cols, used);
             if (candidates.Count == 0) continue;
 
             usedShapeIndices.Add(shapeIdx);
-            usedSizes.Add(size);
             return candidates[Random.Range(0, candidates.Count)];
         }
 
-        // 2) Si no queda un tamano distinto, cualquier forma que no se haya usado.
+        // 2) Si hay mas grupos que formas disponibles (por ejemplo, grupos de
+        // una sola mesa), se permite repetir la forma; la carrera sigue siendo
+        // distinta para cada grupo.
         for (int i = 0; i < shapeOrder.Count; i++)
         {
             int shapeIdx = shapeOrder[i];
-            if (usedShapeIndices.Contains(shapeIdx)) continue;
+            if (GroupShapes[shapeIdx].Length != targetSize) continue;
 
             List<List<int>> candidates = ShapeCandidates(GroupShapes[shapeIdx], cells, rows, cols, used);
             if (candidates.Count == 0) continue;
 
-            usedShapeIndices.Add(shapeIdx);
-            usedSizes.Add(GroupShapes[shapeIdx].Length);
+            if (!usedShapeIndices.Contains(shapeIdx)) usedShapeIndices.Add(shapeIdx);
             return candidates[Random.Range(0, candidates.Count)];
         }
 
