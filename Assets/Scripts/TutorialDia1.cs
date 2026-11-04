@@ -69,7 +69,7 @@ public class TutorialDia1 : MonoBehaviour
             MoverBotonesDebajo();
             if (txtNombreNPC != null) txtNombreNPC.text = "JEFE DE CAMPUS";
             if (txtDialogo != null) txtDialogo.text = "Mueve posicionDialogo y posicionNPC en el Inspector";
-            if (txtContador != null) txtContador.text = "1 / 6";
+            if (txtContador != null) txtContador.text = "1 / 7";
             if (rtDialogo != null) rtDialogo.anchoredPosition = posicionDialogo;
             if (rtAvatar != null) rtAvatar.anchoredPosition = posicionNPC;
             return;
@@ -348,10 +348,12 @@ public class TutorialDia1 : MonoBehaviour
     {
         pasos.Clear();
         pasos.Add(new PasoTutorial { titulo = "BIENVENIDA", descripcion = "¡Hola, nuevo becario!\nYo soy el Jefe de Campus y te voy a enseñar lo esencial para mantener esta sala funcionando.", highlightPos = Vector3.zero, highlightSize = Vector2.zero });
-        pasos.Add(new PasoTutorial { titulo = "ASIGNAR ALUMNOS", descripcion = "Mira la FILA de la izquierda. Arrastra cada alumno hasta una MESA libre.\nSi es su MESA IDEAL recibirás más puntos. Si es otra mesa válida, también funciona pero con menos recompensa.", highlightPos = new Vector3(-5.5f, -0.5f, 0), highlightSize = new Vector2(5, 4) });
+        pasos.Add(new PasoTutorial { titulo = "CARRERAS DE TECSUP", descripcion = "Cada alumno es de una carrera: MEC, AUT, MKT, MIN, SST o SIM.\nVeras su carrera en la etiqueta sobre el cuerpo y en el color.\nMira la FILA de la izquierda y arrastra cada alumno hasta una de las MESAS (cada dia se abren mas, hasta 24).", highlightPos = new Vector3(-7.9f, 1.0f, 0), highlightSize = new Vector2(4, 5) });
+        pasos.Add(new PasoTutorial { titulo = "JUNTA LA MISMA CARRERA", descripcion = "Cada mesa tiene 2 sitios.\nSi sientas juntos a dos alumnos de la MISMA carrera se llevan bien y ganan bonus.\nSi sientas a dos carreras DISTINTAS... ¡se pelean y la eficiencia baja un 10%!\nSi siguen juntos, vuelven a pelear cada pocos segundos.", highlightPos = new Vector3(-2.0f, 1.0f, 0), highlightSize = new Vector2(6, 3) });
+        pasos.Add(new PasoTutorial { titulo = "ENCHUFES Y GRUPOS", descripcion = "Algunos alumnos llegan con BATERIA BAJA: veras un icono amarillo sobre ellos.\nEsas mesas muestran un RAYO amarillo; si los sientas sin enchufe pierden eficiencia y rinden menos.\nLas mesas con una FRANJA DE COLOR son grupos exclusivos de una carrera: si sientas otra carrera habra pelea.\nLos grupos cambian en cada nivel y en cada reintento.", highlightPos = Vector3.zero, highlightSize = new Vector2(7, 4) });
         pasos.Add(new PasoTutorial { titulo = "AYUDAR A IRSE", descripcion = "Cuando un alumno acaba y queda LISTO, aparece sobre él un indicador.\nPara que recoja y se vaya, ¡HAZ CLIC repetidos sobre ese alumno!\nCuantos más clics, antes se marcha.", highlightPos = Vector3.zero, highlightSize = new Vector2(2.5f, 2.5f) });
         pasos.Add(new PasoTutorial { titulo = "APARTADOS Y LIMPIEZA", descripcion = "De vez en cuando verás un APARTADO en alguna mesa: estará bloqueada.\nPara quitarlo, mantén el CLIC y mueve el cursor sobre la mancha arrastrando hasta que desaparezca.\nTambién tendrás que limpiar manchas sueltas de la misma forma.", highlightPos = Vector3.zero, highlightSize = new Vector2(3.5f, 2.8f) });
-        pasos.Add(new PasoTutorial { titulo = "RUSH Y BONO", descripcion = "En los ÚLTIMOS 30 SEGUNDOS llega el RUSH: más alumnos en menos tiempo.\nSi aparece el botón de BONO DE SILENCIO, úsalo con inteligencia: limpia toda la sala y congela la paciencia 6 segundos.\nSiempre puedes PAUSAR con el botón superior.", highlightPos = Vector3.zero, highlightSize = new Vector2(3, 2) });
+        pasos.Add(new PasoTutorial { titulo = "RUSH Y BONO", descripcion = "En los ÚLTIMOS 20 SEGUNDOS llega el RUSH: más alumnos en menos tiempo.\nSi aparece el botón de BONO DE SILENCIO, úsalo con inteligencia: limpia toda la sala y congela la paciencia 6 segundos.\nSiempre puedes PAUSAR con el botón superior.", highlightPos = Vector3.zero, highlightSize = new Vector2(3, 2) });
         pasos.Add(new PasoTutorial { titulo = "TODO LISTO", descripcion = "Ya lo tienes claro.\nRecuerda: mantén la EFICIENCIA por encima del OBJETIVO del día para superarlo.\n¡VAMOS, que empieza la jornada!", highlightPos = Vector3.zero, highlightSize = Vector2.zero });
     }
     

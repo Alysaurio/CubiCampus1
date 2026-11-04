@@ -27,9 +27,9 @@ public class GameManager : MonoBehaviour
     public float rushLastSeconds = 30f;
 
     [Header("Apartados")]
-    public float apartadoMin = 25f;
-    public float apartadoMax = 40f;
-    public float apartadoContaminationRadius = 3f;
+    public float apartadoMin = 22f;
+    public float apartadoMax = 36f;
+    public float apartadoContaminationRadius = 4f;
 
     [Header("Penalizaciones")]
     public int penaltyAbandon = 150;
@@ -39,25 +39,35 @@ public class GameManager : MonoBehaviour
 
     [Header("Eficiencia (arranca al 100% y se mueve segun la atencion)")]
     [Range(0f, 100f)] public float efficiencyStart = 100f;
-    public float effGainHappy = 4f;          // por alumno atendido (escala con su paciencia)
-    public float effGainAttention = 2f;      // resolver una distraccion
-    public float effLossAbandon = 12f;       // abandono en la fila
-    public float effLossEarlyLeave = 8f;     // se distrajo y se fue
-    public float effLossWrongSeat = 6f;      // sentarlo en una mesa inadecuada
+    public float effGainHappy = 5f;          // por alumno atendido (escala con su paciencia)
+    public float effGainAttention = 2.5f;    // resolver una distraccion
+    public float effLossAbandon = 10f;       // abandono en la fila
+    public float effLossEarlyLeave = 7f;     // se distrajo y se fue
     public float effLossBadAssign = 4f;      // soltarlo sobre una mesa no disponible
-    public float effLossIgnoredReady = 5f;   // alumno listo esperando demasiado (una sola vez)
-    public float effReadyGrace = 8f;         // segundos de gracia antes de esa penalizacion
+    public float effLossIgnoredReady = 4f;   // alumno listo esperando demasiado (una sola vez)
+    public float effReadyGrace = 6f;         // segundos de gracia antes de esa penalizacion
+
+    [Header("Peleas de carreras")]
+    [Tooltip("Eficiencia que se pierde cada vez que dos carreras distintas comparten mesa.")]
+    public float effLossFight = 10f;
+    [Tooltip("Si siguen juntos, vuelven a pelearse cada X segundos y se repite la perdida.")]
+    public float fightRepeatSeconds = 10f;
+
+    [Header("Cargadores")]
+    [Tooltip("Eficiencia que se pierde cuando un alumno con bateria baja se sienta sin enchufe.")]
+    public float effLossNoCharge = 6f;
+    [Tooltip("Velocidad de estudio de un alumno sin cargador (1 = normal).")]
+    [Range(0.1f, 1f)] public float noChargeStudyFactor = 0.65f;
+    [Tooltip("Multiplicador de puntos al terminar si estudio sin cargador.")]
+    [Range(0.1f, 1f)] public float noChargeScoreFactor = 0.75f;
 
     [Header("Modo Rush")]
     [Tooltip("En rush llegan mas alumnos: su paciencia en la fila baja mas despacio para que no abandonen solos.")]
     [Range(0.1f, 1f)] public float rushPatienceFactor = 0.55f;
 
-    [Header("Puntos")]
-    [Range(0f, 1f)] public float wrongSeatPointsFactor = 0.4f; // mesa inadecuada = menos puntos
-
     [Header("Salida por clics")]
-    public float packDuration = 2.6f;    // segundos que tarda en recoger sin ayuda
-    public float packClickPower = 0.35f; // segundos que quita cada clic
+    public float packDuration = 1.4f;    // segundos que tarda en recoger sin ayuda
+    public float packClickPower = 0.55f; // segundos que quita cada clic
 
     // --- estado del turno ---
     float timeLeft;
@@ -73,6 +83,8 @@ public class GameManager : MonoBehaviour
     int earlyLeaves;
     int badAssignments;
     int relocations;
+    int fights;
+    int noCharger;
     float efficiency;
 
     int perfectStreak;
@@ -84,7 +96,7 @@ public class GameManager : MonoBehaviour
     string message = "";
     float messageUntil;
 
-    readonly Dictionary<StudentKind, StudentProfile> profiles = new Dictionary<StudentKind, StudentProfile>();
+    readonly Dictionary<Career, StudentProfile> profiles = new Dictionary<Career, StudentProfile>();
 
     // --- propiedades para el HUD ---
     public bool IsPlaying { get { return playing; } }
@@ -100,6 +112,8 @@ public class GameManager : MonoBehaviour
     public int Abandoned { get { return abandoned; } }
     public int EarlyLeaves { get { return earlyLeaves; } }
     public int BadAssignments { get { return badAssignments; } }
+    public int Fights { get { return fights; } }
+    public int NoCharger { get { return noCharger; } }
     public bool IsRush { get { return rush; } }
     public bool PatienceFrozen { get { return freezeLeft > 0f; } }
     public bool BonoAvailable { get { return bonoAvailable; } }
@@ -107,6 +121,14 @@ public class GameManager : MonoBehaviour
     public int ComboMultiplier { get { return comboLeft > 0f ? 2 : 1; } }
     public float ComboLeft { get { return Mathf.Max(0f, comboLeft); } }
     public int PerfectStreak { get { return perfectStreak; } }
+    public float DistractionChance
+    {
+        get { return configDia != null ? configDia.distractionChance : 0.15f; }
+    }
+    public float ChargeChance
+    {
+        get { return configDia != null ? configDia.chargeChance : 0.2f; }
+    }
     // La eficiencia arranca en 100% y solo baja si la atencion es mala.
     public bool IsAlert
     {
@@ -178,6 +200,10 @@ public class GameManager : MonoBehaviour
         AudioManager.SetMusicLevel(0.62f);
         AudioManager.SetMusicDuck(false);
 
+        // La sala se adapta a las 24 mesas dobles: amplia el aula, recoloca las
+        // mesas y crea las que falten sin necesidad de reabrir la escena.
+        RoomLayout.Apply(this);
+
         // La campana se juega en la misma sala: el dia guardado define turno,
         // mesas activas, ritmo de alumnos, apartados y paciencia.
         diaActual = DayProgression.DiaGuardado();
@@ -198,20 +224,18 @@ public class GameManager : MonoBehaviour
         {
             queue.spawnInterval = configDia.spawnInterval;
             queue.firstSpawnDelay = configDia.firstSpawnDelay;
-            queue.weightLector = configDia.weightLector;
-            queue.weightTesis = configDia.weightTesis;
-            queue.weightGrupo = configDia.weightGrupo;
-            queue.weightDespistado = configDia.weightDespistado;
-            queue.maxDistracted = configDia.maxDistracted;
         }
 
-        // Dias 1-2: solo los 4 cubiculos de silencio. Desde el dia 3 se abren
-        // las mesas dobles y la zona de ruido.
+        // Las mesas se abren de forma escalada: 8 al principio y 24 al final.
         for (int i = 0; i < seats.Count; i++)
         {
             if (seats[i] == null) continue;
             seats[i].gameObject.SetActive(i < configDia.activeSeats);
         }
+
+        // Enchufes y pequenos grupos exclusivos de una carrera. Cambian en cada
+        // nivel y en cada reintento porque la escena se vuelve a cargar.
+        RoomLayout.ConfigureLevel(this, configDia);
     }
 
     void Start()
@@ -225,7 +249,7 @@ public class GameManager : MonoBehaviour
         AudioManager.Play(Sfx.DayStart, 0.85f, 1f);
 
         SetMessage("DIA " + diaActual + ": meta " + Mathf.RoundToInt(configDia.umbralEficiencia) +
-                   "%. Arrastra cada estudiante a su mesa", 5f);
+                   "%. Junta la misma carrera en cada mesa", 5f);
 
         SpawnTutorialIfNeeded();
     }
@@ -306,6 +330,8 @@ public class GameManager : MonoBehaviour
             SetMessage("Alumno esperando sin atender -" + Mathf.RoundToInt(effLossIgnoredReady * ignored), 1.8f);
         }
 
+        UpdateCareerConflicts(Time.deltaTime);
+
         apartadoTimer -= Time.deltaTime;
         if (apartadoTimer <= 0f)
         {
@@ -328,11 +354,11 @@ public class GameManager : MonoBehaviour
 
     // ------------------------------------------------------------------ perfiles
 
-    public StudentProfile GetProfile(StudentKind kind)
+    public StudentProfile GetProfile(Career career)
     {
-        if (!profiles.ContainsKey(kind)) profiles[kind] = StudentProfile.Create(kind);
+        if (!profiles.ContainsKey(career)) profiles[career] = StudentProfile.Create(career);
 
-        StudentProfile p = profiles[kind].Clone();
+        StudentProfile p = profiles[career].Clone();
         // Los primeros dias son mas tolerantes con la fila.
         float mult = configDia != null ? Mathf.Clamp(configDia.patienceMultiplier, 0.3f, 3f) : 1f;
         p.patience *= mult;
@@ -348,13 +374,24 @@ public class GameManager : MonoBehaviour
 
     public void RegisterAssigned(Student s)
     {
-        // Mesa inadecuada: se permite, pero cuesta eficiencia y menos puntos.
-        if (s != null && s.wrongSeat)
+        if (s == null) return;
+
+        // Mesa con otra carrera: se permite, pero la pareja se peleara.
+        if (s.careerConflict)
         {
             perfectStreak = 0;
-            AddEfficiency(-effLossWrongSeat);
             AudioManager.Play(Sfx.Error, 0.8f, 0.9f);
-            SetMessage("Mesa inadecuada: ganaras menos puntos por " + s.profile.displayName, 2f);
+            string aviso = s.seat != null
+                ? s.seat.MismatchReason(s.profile, false)
+                : "Carreras distintas: se van a pelear (-" + Mathf.RoundToInt(effLossFight) + "% eficiencia)";
+            SetMessage(aviso, 2.2f);
+            return;
+        }
+
+        // Bateria baja sin enchufe: no cuenta como asignacion perfecta.
+        if (s.missingCharge)
+        {
+            perfectStreak = 0;
             return;
         }
 
@@ -363,15 +400,15 @@ public class GameManager : MonoBehaviour
         if (perfectStreak >= 3)
         {
             perfectStreak = 0;
-            comboLeft = 15f;
+            comboLeft = 12f;
             bonoAvailable = true;
             AudioManager.Play(Sfx.Combo, 1f, 1f);
-            SetMessage("COMBO x2 durante 15s", 2.5f);
+            SetMessage("COMBO x2 durante 12s", 2.5f);
         }
         else
         {
             AudioManager.Play(Sfx.Assign, 0.9f, 0.97f + 0.06f * (perfectStreak % 2));
-            SetMessage("+" + s.profile.basePoints + " " + s.profile.displayName, 1.2f);
+            SetMessage("+" + s.profile.basePoints + " " + s.profile.shortName + " " + s.profile.displayName, 1.2f);
         }
     }
 
@@ -386,21 +423,15 @@ public class GameManager : MonoBehaviour
         if (s.sharedDouble)
             pts = Mathf.RoundToInt(pts * (pairBonus ? 1.25f : 0.8f));
 
-        if (comboLeft > 0f) pts *= 2;
+        if (s.missingCharge)
+            pts = Mathf.RoundToInt(pts * noChargeScoreFactor);
 
-        if (s.wrongSeat)
-        {
-            pts = Mathf.Max(1, Mathf.RoundToInt(pts * wrongSeatPointsFactor));
-            score += pts;
-            happy++;
-            SetMessage("+" + pts + " " + s.profile.displayName + " (mesa inadecuada)", 1.8f);
-            return;
-        }
+        if (comboLeft > 0f) pts *= 2;
 
         score += pts;
         happy++;
         AddEfficiency(effGainHappy * (0.35f + 0.65f * Mathf.Clamp01(patienceFrac)));
-        SetMessage("+" + pts + " " + s.profile.displayName, 1.4f);
+        SetMessage("+" + pts + " " + s.profile.shortName + " " + s.profile.displayName, 1.4f);
     }
 
     public void RegisterAbandon(Student s)
@@ -451,6 +482,111 @@ public class GameManager : MonoBehaviour
         AddEfficiency(effGainAttention);
         AudioManager.Play(Sfx.Attention, 1f, 1f);
         SetMessage("+25 atencion", 1.2f);
+    }
+
+    /// <summary>
+    /// Alumno con bateria baja sentado en una mesa sin enchufe: primer aviso y
+    /// perdida de eficiencia. A partir de ahi estudia mas lento y da menos puntos.
+    /// </summary>
+    public void RegisterNoCharger(Student s)
+    {
+        if (s == null) return;
+
+        noCharger++;
+        perfectStreak = 0;
+        AddEfficiency(-effLossNoCharge);
+        AudioManager.Play(Sfx.Error, 0.75f, 0.9f);
+        SetMessage("BATERIA BAJA: sin enchufe -" + Mathf.RoundToInt(effLossNoCharge) +
+                   "% eficiencia. Muevelo a una mesa con cargador", 2.6f);
+    }
+
+    /// <summary>
+    /// Dos alumnos de carreras distintas estan compartiendo mesa: se pelean y
+    /// la eficiencia baja un 10%. Si siguen juntos, la pelea se repite.
+    /// </summary>
+    public void RegisterCareerFight(Seat seat)
+    {
+        if (seat == null) return;
+
+        fights++;
+        perfectStreak = 0;
+        comboLeft = 0f;
+        AddEfficiency(-effLossFight);
+        AudioManager.Play(Sfx.Error, 1f, 0.88f);
+
+        string a = "?";
+        string b = "?";
+        for (int i = 0; i < seat.occupants.Count; i++)
+        {
+            Student s1 = seat.occupants[i];
+            if (s1 == null || s1.profile == null) continue;
+
+            for (int j = i + 1; j < seat.occupants.Count; j++)
+            {
+                Student s2 = seat.occupants[j];
+                if (s2 == null || s2.profile == null) continue;
+                if (s1.profile.career == s2.profile.career) continue;
+
+                a = s1.profile.shortName;
+                b = s2.profile.shortName;
+                break;
+            }
+
+            if (a != "?") break;
+        }
+
+        // Si la mesa es de grupo exclusivo, tambien avisamos cuando solo hay
+        // un alumno de otra carrera (no hay pareja con quien comparar).
+        if (a == "?" && seat.exclusive)
+        {
+            a = StudentProfile.ShortCode(seat.exclusiveCareer);
+            for (int i = 0; i < seat.occupants.Count; i++)
+            {
+                Student s = seat.occupants[i];
+                if (s == null || s.profile == null) continue;
+                if (s.profile.career == seat.exclusiveCareer) continue;
+                b = s.profile.shortName;
+                break;
+            }
+        }
+
+        string tipo = seat.exclusive ? "GRUPO EXCLUSIVO" : "PELEA";
+        SetMessage(tipo + " mesa " + seat.seatId + ": " + a + " vs " + b +
+                   "  -" + Mathf.RoundToInt(effLossFight) + "% eficiencia", 2.4f);
+    }
+
+    void UpdateCareerConflicts(float dt)
+    {
+        for (int i = 0; i < seats.Count; i++)
+        {
+            Seat s = seats[i];
+            if (s == null || !s.gameObject.activeInHierarchy) continue;
+
+            if (s.HasCareerConflict)
+            {
+                if (!s.fightActive)
+                {
+                    s.fightActive = true;
+                    s.fightTimer = fightRepeatSeconds;
+                    s.SetFighting(true);
+                    RegisterCareerFight(s);
+                }
+                else
+                {
+                    s.fightTimer -= dt;
+                    if (s.fightTimer <= 0f)
+                    {
+                        s.fightTimer = fightRepeatSeconds;
+                        RegisterCareerFight(s);
+                    }
+                }
+            }
+            else if (s.fightActive)
+            {
+                s.fightActive = false;
+                s.SetFighting(false);
+            }
+        }
     }
 
     public void SetDragOrder(Student s, bool on)
@@ -550,6 +686,7 @@ public class GameManager : MonoBehaviour
         PlayerPrefs.SetInt("UltimosAtendidos", happy);
         PlayerPrefs.SetInt("UltimosAbandonos", abandoned);
         PlayerPrefs.SetInt("UltimosLlegados", arrived);
+        PlayerPrefs.SetInt("UltimasPeleas", fights);
         PlayerPrefs.SetInt("UltimosPuntos", score);
         PlayerPrefs.SetInt("UltimoDia", diaActual);
         // Identificador unico del turno: evita registrar dos veces la misma partida en el top-10.

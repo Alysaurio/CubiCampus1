@@ -3,7 +3,8 @@ using UnityEngine;
 
 /// <summary>
 /// Configuracion de un dia de la campana: umbral, duracion del turno, ritmo de
-/// llegada de alumnos, frecuencia de apartados, paciencia y tipos disponibles.
+/// llegada de alumnos, frecuencia de apartados, paciencia y mesas activas.
+/// El ritmo es mas corto e intenso para que el turno tenga mas energia.
 /// </summary>
 [Serializable]
 public class DayConfig
@@ -15,42 +16,38 @@ public class DayConfig
     public float umbralEficiencia = 60f;
 
     [Header("Turno")]
-    public float turnDuration = 150f;
-    public float rushLastSeconds = 25f;
+    public float turnDuration = 95f;
+    public float rushLastSeconds = 20f;
 
     [Header("Llegada de alumnos")]
-    public float spawnInterval = 9.5f;
-    public float firstSpawnDelay = 1.5f;
+    public float spawnInterval = 3.2f;
+    public float firstSpawnDelay = 0.6f;
 
     [Header("Apartados")]
-    public float apartadoMin = 42f;
-    public float apartadoMax = 58f;
+    public float apartadoMin = 32f;
+    public float apartadoMax = 44f;
 
     [Header("Paciencia")]
-    [Tooltip("Multiplicador sobre la paciencia base de cada perfil. Los primeros dias son mas tolerantes.")]
-    public float patienceMultiplier = 1.35f;
+    [Tooltip("Multiplicador sobre la paciencia base de cada carrera. Los primeros dias son mas tolerantes.")]
+    public float patienceMultiplier = 1.25f;
 
     [Header("Sala")]
-    [Tooltip("Mesas activas: 4 en el tutorial (cubiculos), 8 desde el dia 3.")]
-    public int activeSeats = 4;
+    [Tooltip("Mesas activas: 8 en el tutorial y hasta 24 en el dia 10.")]
+    public int activeSeats = 8;
 
-    [Header("Mezcla de alumnos")]
-    public float weightLector = 0.58f;
-    public float weightTesis = 0.22f;
-    public float weightGrupo = 0f;
-    public float weightDespistado = 0.20f;
+    [Header("Distracciones")]
+    [Tooltip("Probabilidad de que un alumno se distraiga a mitad del estudio.")]
+    [Range(0f, 1f)] public float distractionChance = 0.12f;
 
-    [Tooltip("Maximo de despistados a la vez (fila + mesas).")]
-    public int maxDistracted = 1;
+    [Header("Cargadores")]
+    [Tooltip("Probabilidad de que un alumno llegue con bateria baja y necesite enchufe.")]
+    [Range(0f, 1f)] public float chargeChance = 0.18f;
 }
 
 /// <summary>
 /// Campana de 10 dias en la misma sala. La dificultad sube de forma escalada:
-/// mas alumnos, apartados mas frecuentes, rush mas largo y desde el dia 8 dos
-/// despistados simultaneos. El umbral pasa de 60% (tutorial) a 75%.
-///
-/// El dia actual se guarda en PlayerPrefs con la clave "DiaActual" para que el
-/// menu ofrezca continuar donde se quedo el jugador.
+/// mas alumnos, apartados mas frecuentes, rush mas largo y mas mesas abiertas.
+/// El dia actual se guarda en PlayerPrefs con la clave "DiaActual".
 /// </summary>
 public static class DayProgression
 {
@@ -58,125 +55,125 @@ public static class DayProgression
 
     static readonly DayConfig[] dias =
     {
-        // dia 1 - tutorial: 4 cubiculos, sin grupos, paciencia muy alta
+        // dia 1 - tutorial: 8 mesas, ritmo tranquilo pero ya con energia
         new DayConfig
         {
             dia = 1, titulo = "Primer turno",
             umbralEficiencia = 60f,
-            turnDuration = 150f, rushLastSeconds = 25f,
-            spawnInterval = 9.5f, firstSpawnDelay = 1.5f,
-            apartadoMin = 42f, apartadoMax = 58f,
-            patienceMultiplier = 1.35f, activeSeats = 4,
-            weightLector = 0.58f, weightTesis = 0.22f, weightGrupo = 0f, weightDespistado = 0.20f,
-            maxDistracted = 1
+            turnDuration = 95f, rushLastSeconds = 20f,
+            spawnInterval = 3.2f, firstSpawnDelay = 0.6f,
+            apartadoMin = 32f, apartadoMax = 44f,
+            patienceMultiplier = 1.25f, activeSeats = 8,
+            distractionChance = 0.12f,
+            chargeChance = 0.18f
         },
-        // dia 2 - sigue el tutorial, algo mas de gente
+        // dia 2 - mas gente y primeras peleas de carreras
         new DayConfig
         {
             dia = 2, titulo = "Ritmo de biblioteca",
             umbralEficiencia = 60f,
-            turnDuration = 155f, rushLastSeconds = 28f,
-            spawnInterval = 9f, firstSpawnDelay = 1.4f,
-            apartadoMin = 39f, apartadoMax = 54f,
-            patienceMultiplier = 1.25f, activeSeats = 4,
-            weightLector = 0.50f, weightTesis = 0.28f, weightGrupo = 0f, weightDespistado = 0.22f,
-            maxDistracted = 1
+            turnDuration = 98f, rushLastSeconds = 22f,
+            spawnInterval = 3.0f, firstSpawnDelay = 0.6f,
+            apartadoMin = 30f, apartadoMax = 42f,
+            patienceMultiplier = 1.18f, activeSeats = 10,
+            distractionChance = 0.14f,
+            chargeChance = 0.20f
         },
-        // dia 3 - se abren las 8 mesas y llegan los grupos ruidosos
+        // dia 3 - se abren 12 mesas
         new DayConfig
         {
             dia = 3, titulo = "Sala completa",
-            umbralEficiencia = 75f,
-            turnDuration = 160f, rushLastSeconds = 32f,
-            spawnInterval = 8.5f, firstSpawnDelay = 1.3f,
-            apartadoMin = 35f, apartadoMax = 50f,
-            patienceMultiplier = 1.15f, activeSeats = 8,
-            weightLector = 0.40f, weightTesis = 0.20f, weightGrupo = 0.20f, weightDespistado = 0.20f,
-            maxDistracted = 1
+            umbralEficiencia = 72f,
+            turnDuration = 100f, rushLastSeconds = 22f,
+            spawnInterval = 2.8f, firstSpawnDelay = 0.55f,
+            apartadoMin = 28f, apartadoMax = 40f,
+            patienceMultiplier = 1.10f, activeSeats = 12,
+            distractionChance = 0.16f,
+            chargeChance = 0.22f
         },
         // dia 4
         new DayConfig
         {
             dia = 4, titulo = "Semana de examenes",
-            umbralEficiencia = 75f,
-            turnDuration = 165f, rushLastSeconds = 34f,
-            spawnInterval = 8f, firstSpawnDelay = 1.2f,
-            apartadoMin = 32f, apartadoMax = 46f,
-            patienceMultiplier = 1.08f, activeSeats = 8,
-            weightLector = 0.38f, weightTesis = 0.20f, weightGrupo = 0.22f, weightDespistado = 0.20f,
-            maxDistracted = 1
+            umbralEficiencia = 72f,
+            turnDuration = 104f, rushLastSeconds = 24f,
+            spawnInterval = 2.6f, firstSpawnDelay = 0.55f,
+            apartadoMin = 26f, apartadoMax = 37f,
+            patienceMultiplier = 1.05f, activeSeats = 14,
+            distractionChance = 0.18f,
+            chargeChance = 0.22f
         },
         // dia 5
         new DayConfig
         {
             dia = 5, titulo = "Punto medio",
-            umbralEficiencia = 75f,
-            turnDuration = 170f, rushLastSeconds = 36f,
-            spawnInterval = 7.5f, firstSpawnDelay = 1.2f,
-            apartadoMin = 29f, apartadoMax = 42f,
-            patienceMultiplier = 1f, activeSeats = 8,
-            weightLector = 0.35f, weightTesis = 0.20f, weightGrupo = 0.24f, weightDespistado = 0.21f,
-            maxDistracted = 1
+            umbralEficiencia = 72f,
+            turnDuration = 106f, rushLastSeconds = 24f,
+            spawnInterval = 2.45f, firstSpawnDelay = 0.5f,
+            apartadoMin = 24f, apartadoMax = 34f,
+            patienceMultiplier = 1f, activeSeats = 16,
+            distractionChance = 0.20f,
+            chargeChance = 0.24f
         },
         // dia 6
         new DayConfig
         {
             dia = 6, titulo = "Aforo tensionado",
-            umbralEficiencia = 75f,
-            turnDuration = 172f, rushLastSeconds = 38f,
-            spawnInterval = 7f, firstSpawnDelay = 1.1f,
-            apartadoMin = 27f, apartadoMax = 39f,
-            patienceMultiplier = 0.96f, activeSeats = 8,
-            weightLector = 0.32f, weightTesis = 0.21f, weightGrupo = 0.25f, weightDespistado = 0.22f,
-            maxDistracted = 1
+            umbralEficiencia = 74f,
+            turnDuration = 110f, rushLastSeconds = 26f,
+            spawnInterval = 2.3f, firstSpawnDelay = 0.5f,
+            apartadoMin = 22f, apartadoMax = 32f,
+            patienceMultiplier = 0.96f, activeSeats = 18,
+            distractionChance = 0.22f,
+            chargeChance = 0.26f
         },
         // dia 7
         new DayConfig
         {
             dia = 7, titulo = "Vigilia de biblioteca",
-            umbralEficiencia = 75f,
-            turnDuration = 175f, rushLastSeconds = 40f,
-            spawnInterval = 6.5f, firstSpawnDelay = 1.1f,
-            apartadoMin = 24f, apartadoMax = 36f,
-            patienceMultiplier = 0.92f, activeSeats = 8,
-            weightLector = 0.30f, weightTesis = 0.21f, weightGrupo = 0.26f, weightDespistado = 0.23f,
-            maxDistracted = 1
+            umbralEficiencia = 74f,
+            turnDuration = 112f, rushLastSeconds = 26f,
+            spawnInterval = 2.15f, firstSpawnDelay = 0.5f,
+            apartadoMin = 20f, apartadoMax = 30f,
+            patienceMultiplier = 0.93f, activeSeats = 20,
+            distractionChance = 0.24f,
+            chargeChance = 0.27f
         },
-        // dia 8 - dos despistados a la vez
+        // dia 8 - 22 mesas
         new DayConfig
         {
-            dia = 8, titulo = "Dos despistados",
-            umbralEficiencia = 75f,
-            turnDuration = 177f, rushLastSeconds = 42f,
-            spawnInterval = 6.2f, firstSpawnDelay = 1f,
-            apartadoMin = 22f, apartadoMax = 34f,
-            patienceMultiplier = 0.88f, activeSeats = 8,
-            weightLector = 0.28f, weightTesis = 0.20f, weightGrupo = 0.28f, weightDespistado = 0.24f,
-            maxDistracted = 2
+            dia = 8, titulo = "Choque de carreras",
+            umbralEficiencia = 74f,
+            turnDuration = 115f, rushLastSeconds = 28f,
+            spawnInterval = 2.0f, firstSpawnDelay = 0.45f,
+            apartadoMin = 18f, apartadoMax = 28f,
+            patienceMultiplier = 0.90f, activeSeats = 22,
+            distractionChance = 0.26f,
+            chargeChance = 0.28f
         },
         // dia 9
         new DayConfig
         {
             dia = 9, titulo = "Casi al limite",
-            umbralEficiencia = 75f,
-            turnDuration = 179f, rushLastSeconds = 43f,
-            spawnInterval = 5.9f, firstSpawnDelay = 1f,
-            apartadoMin = 20f, apartadoMax = 31f,
-            patienceMultiplier = 0.85f, activeSeats = 8,
-            weightLector = 0.26f, weightTesis = 0.20f, weightGrupo = 0.30f, weightDespistado = 0.24f,
-            maxDistracted = 2
+            umbralEficiencia = 76f,
+            turnDuration = 118f, rushLastSeconds = 28f,
+            spawnInterval = 1.9f, firstSpawnDelay = 0.45f,
+            apartadoMin = 17f, apartadoMax = 26f,
+            patienceMultiplier = 0.88f, activeSeats = 23,
+            distractionChance = 0.28f,
+            chargeChance = 0.30f
         },
-        // dia 10 - final
+        // dia 10 - final: las 24 mesas abiertas
         new DayConfig
         {
             dia = 10, titulo = "Aforo al limite",
-            umbralEficiencia = 75f,
-            turnDuration = 180f, rushLastSeconds = 45f,
-            spawnInterval = 5.6f, firstSpawnDelay = 0.9f,
-            apartadoMin = 18f, apartadoMax = 28f,
-            patienceMultiplier = 0.82f, activeSeats = 8,
-            weightLector = 0.24f, weightTesis = 0.20f, weightGrupo = 0.32f, weightDespistado = 0.24f,
-            maxDistracted = 2
+            umbralEficiencia = 76f,
+            turnDuration = 122f, rushLastSeconds = 30f,
+            spawnInterval = 1.8f, firstSpawnDelay = 0.4f,
+            apartadoMin = 16f, apartadoMax = 24f,
+            patienceMultiplier = 0.85f, activeSeats = 24,
+            distractionChance = 0.30f,
+            chargeChance = 0.32f
         }
     };
 
@@ -212,7 +209,7 @@ public static class DayProgression
         GuardarDia(1);
     }
 
-    /// <summary>Texto corto para HUD y menu: "DIA 3 / 10 - META 75%".</summary>
+    /// <summary>Texto corto para HUD y menu: "DIA 3 / 10 - META 72%".</summary>
     public static string Etiqueta(int dia)
     {
         DayConfig c = Get(dia);

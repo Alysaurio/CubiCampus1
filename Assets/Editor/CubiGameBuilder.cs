@@ -8,8 +8,8 @@ using UnityEditor.SceneManagement;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Reconstruye GameScene: sala cenital 2D (cuadrados), 8 puestos, fila de espera,
-/// HUD y managers del bucle de juego.
+/// Reconstruye GameScene: sala cenital 2D (cuadrados), 24 mesas dobles, fila de
+/// espera, HUD y managers del bucle de juego.
 /// Menu: Tools > CubiCampus > Rebuild Game Scene
 /// </summary>
 public static class CubiGameBuilder
@@ -42,10 +42,10 @@ public static class CubiGameBuilder
         camGO.tag = "MainCamera";
         Camera cam = camGO.AddComponent<Camera>();
         cam.orthographic = true;
-        cam.orthographicSize = 5.2f;
+        cam.orthographicSize = 6.55f;
         cam.clearFlags = CameraClearFlags.SolidColor;
         cam.backgroundColor = ColFondo;
-        cam.transform.position = new Vector3(0.7f, -0.5f, -10f);
+        cam.transform.position = new Vector3(0.45f, -0.2f, -10f);
         camGO.AddComponent<AudioListener>();
 
         // ---------------------------------------------------------------- event system
@@ -56,59 +56,55 @@ public static class CubiGameBuilder
         GameObject room = new GameObject("Sala");
 
         // Piso
-        GameObject piso = NewSprite("Piso", room.transform, new Vector3(1.0f, -0.7f, 0f), new Vector2(14.6f, 7.6f), ColPiso, -20);
+        NewSprite("Piso", room.transform, new Vector3(0.5f, -0.2f, 0f), new Vector2(19.8f, 9.3f), ColPiso, -20);
 
         // Paredes
-        NewSprite("ParedArriba", room.transform, new Vector3(1.0f, 3.2f, 0f), new Vector2(14.9f, 0.25f), ColPared, -18);
-        NewSprite("ParedAbajo", room.transform, new Vector3(1.0f, -4.6f, 0f), new Vector2(14.9f, 0.25f), ColPared, -18);
-        NewSprite("ParedIzquierda", room.transform, new Vector3(-6.45f, -0.7f, 0f), new Vector2(0.25f, 7.9f), ColPared, -18);
-        NewSprite("ParedDerecha", room.transform, new Vector3(8.45f, -0.7f, 0f), new Vector2(0.25f, 7.9f), ColPared, -18);
+        NewSprite("ParedArriba", room.transform, new Vector3(0.5f, 4.45f, 0f), new Vector2(20.2f, 0.25f), ColPared, -18);
+        NewSprite("ParedAbajo", room.transform, new Vector3(0.5f, -4.85f, 0f), new Vector2(20.2f, 0.25f), ColPared, -18);
+        NewSprite("ParedIzquierda", room.transform, new Vector3(-9.35f, -0.2f, 0f), new Vector2(0.25f, 9.6f), ColPared, -18);
+        NewSprite("ParedDerecha", room.transform, new Vector3(10.35f, -0.2f, 0f), new Vector2(0.25f, 9.6f), ColPared, -18);
 
-        // Zonas
-        NewSprite("ZonaSilencio", room.transform, new Vector3(-2.0f, 1.25f, 0f), new Vector2(3.9f, 2.7f), ColZonaSil, -15);
-        NewSprite("ZonaDoble", room.transform, new Vector3(2.4f, 1.25f, 0f), new Vector2(3.2f, 2.7f), ColZonaDob, -15);
-        NewSprite("ZonaRuido", room.transform, new Vector3(6.0f, 1.25f, 0f), new Vector2(2.5f, 2.7f), ColZonaRui, -15);
-        NewSprite("ZonaFila", room.transform, new Vector3(-5.2f, 1.05f, 0f), new Vector2(2.0f, 3.9f), ColFila, -15);
+        // Franja de la fila
+        NewSprite("ZonaFila", room.transform, new Vector3(-7.95f, -0.35f, 0f), new Vector2(2.25f, 8.1f), ColFila, -15);
 
-        // Estanterias decorativas
+        // Estanterias decorativas al fondo superior
         for (int i = 0; i < 3; i++)
         {
             NewSprite("Estanteria" + i, room.transform,
-                new Vector3(1.2f + i * 2.6f, -4.25f, 0f), new Vector2(2.2f, 0.42f),
+                new Vector3(1.2f + i * 3.0f, 4.08f, 0f), new Vector2(2.4f, 0.42f),
                 new Color(0.24f, 0.20f, 0.16f), -16);
         }
 
         // Puerta
-        NewSprite("Puerta", room.transform, new Vector3(-5.2f, -4.42f, 0f), new Vector2(1.8f, 0.40f),
+        NewSprite("Puerta", room.transform, new Vector3(-7.95f, -4.52f, 0f), new Vector2(1.9f, 0.40f),
             new Color(0.30f, 0.42f, 0.55f), -14);
-        NewSprite("PuertaLuz", room.transform, new Vector3(-5.2f, -4.18f, 0f), new Vector2(1.3f, 0.12f),
+        NewSprite("PuertaLuz", room.transform, new Vector3(-7.95f, -4.28f, 0f), new Vector2(1.4f, 0.12f),
             new Color(0.55f, 0.85f, 1f, 0.75f), -13);
 
-        // Etiquetas de zona (cuadros de color junto a cada zona)
-        NewSprite("MarcaSilencio", room.transform, new Vector3(-3.75f, 2.55f, 0f), new Vector2(0.22f, 0.22f), new Color(0.34f, 0.60f, 0.92f), -12);
-        NewSprite("MarcaDoble", room.transform, new Vector3(0.90f, 2.55f, 0f), new Vector2(0.22f, 0.22f), new Color(0.30f, 0.78f, 0.54f), -12);
-        NewSprite("MarcaRuido", room.transform, new Vector3(4.85f, 2.55f, 0f), new Vector2(0.22f, 0.22f), new Color(0.95f, 0.60f, 0.28f), -12);
+        // Mesa del profesor + placeholder cuadrado (reemplazable por arte final).
+        CreateTeacherArea(room.transform);
 
         // ---------------------------------------------------------------- puestos
+        // 24 mesas dobles (2 alumnos por mesa): 6 columnas x 4 filas.
         List<Seat> seats = new List<Seat>();
-
-        seats.Add(MakeSeat(room.transform, 1, SeatKind.Simple, new Vector3(-2.9f, 1.90f, 0f), new Vector2(1.55f, 1.0f), true));
-        seats.Add(MakeSeat(room.transform, 2, SeatKind.Simple, new Vector3(-1.1f, 1.90f, 0f), new Vector2(1.55f, 1.0f), false));
-        seats.Add(MakeSeat(room.transform, 3, SeatKind.Simple, new Vector3(-2.9f, 0.60f, 0f), new Vector2(1.55f, 1.0f), false));
-        seats.Add(MakeSeat(room.transform, 4, SeatKind.Simple, new Vector3(-1.1f, 0.60f, 0f), new Vector2(1.55f, 1.0f), true));
-        seats.Add(MakeSeat(room.transform, 5, SeatKind.Doble, new Vector3(2.40f, 1.90f, 0f), new Vector2(2.50f, 1.0f), false));
-        seats.Add(MakeSeat(room.transform, 6, SeatKind.Doble, new Vector3(2.40f, 0.60f, 0f), new Vector2(2.50f, 1.0f), false));
-        seats.Add(MakeSeat(room.transform, 7, SeatKind.Ruido, new Vector3(6.00f, 1.90f, 0f), new Vector2(1.70f, 1.0f), false));
-        seats.Add(MakeSeat(room.transform, 8, SeatKind.Ruido, new Vector3(6.00f, 0.60f, 0f), new Vector2(1.70f, 1.0f), false));
+        for (int row = 0; row < 4; row++)
+        {
+            for (int col = 0; col < 6; col++)
+            {
+                int id = row * 6 + col + 1;
+                Vector3 pos = new Vector3(-5.45f + col * 2.85f, 3.0f - row * 1.8f, 0f);
+                seats.Add(MakeSeat(room.transform, id, SeatKind.Doble, pos, new Vector2(2.6f, 1.25f), false));
+            }
+        }
 
         // ---------------------------------------------------------------- fila
         GameObject queueRoot = new GameObject("Fila");
-        Transform[] slots = new Transform[3];
-        for (int i = 0; i < 3; i++)
+        Transform[] slots = new Transform[4];
+        for (int i = 0; i < slots.Length; i++)
         {
             GameObject slot = new GameObject("SlotFila" + (i + 1));
             slot.transform.SetParent(queueRoot.transform, false);
-            slot.transform.position = new Vector3(-5.2f, 2.10f - i * 1.20f, 0f);
+            slot.transform.position = new Vector3(-7.95f, 2.95f - i * 1.25f, 0f);
             NewSprite("Marca", slot.transform, slot.transform.position + new Vector3(0f, -0.45f, 0f),
                 new Vector2(0.75f, 0.06f), new Color(0.30f, 0.38f, 0.52f, 0.8f), -12);
             slots[i] = slot.transform;
@@ -116,7 +112,7 @@ public static class CubiGameBuilder
 
         GameObject doorPoint = new GameObject("PuntoPuerta");
         doorPoint.transform.SetParent(queueRoot.transform, false);
-        doorPoint.transform.position = new Vector3(-5.2f, -3.7f, 0f);
+        doorPoint.transform.position = new Vector3(-7.95f, -4.05f, 0f);
 
         // ---------------------------------------------------------------- managers
         GameObject gmGO = new GameObject("GameManager");
@@ -128,7 +124,7 @@ public static class CubiGameBuilder
         queue.game = gm;
         queue.doorPoint = doorPoint.transform;
         queue.slots = slots;
-        queue.spawnInterval = 8f;
+        queue.spawnInterval = 2.6f;
 
         GameObject dragGO = new GameObject("DragAssigner");
         DragAssigner drag = dragGO.AddComponent<DragAssigner>();
@@ -209,17 +205,17 @@ public static class CubiGameBuilder
 
         GameObject aforoGO = NewUI("TxtAforo", canvasT);
         Place(aforoGO.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(40f, 68f), new Vector2(620f, 40f));
-        Text txtAforo = AddText(aforoGO, "AFORO  0 / 10", 26, TextAnchor.MiddleLeft, ColTexto);
+        Text txtAforo = AddText(aforoGO, "AFORO  0 / 48", 26, TextAnchor.MiddleLeft, ColTexto);
         txtAforo.fontStyle = FontStyle.Bold;
         hud.txtAforo = txtAforo;
 
         GameObject abGO = NewUI("TxtAbandonos", canvasT);
-        Place(abGO.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(40f, 28f), new Vector2(980f, 36f));
-        hud.txtAbandonos = AddText(abGO, "ATENDIDOS 0   ABANDONOS 0", 21, TextAnchor.MiddleLeft, ColTextoTenue);
+        Place(abGO.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(40f, 28f), new Vector2(1200f, 36f));
+        hud.txtAbandonos = AddText(abGO, "ATENDIDOS 0   ABANDONOS 0   PELEAS 0", 21, TextAnchor.MiddleLeft, ColTextoTenue);
 
         GameObject hintGO = NewUI("TxtHint", canvasT);
-        Place(hintGO.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -94f), new Vector2(900f, 34f));
-        hud.txtHint = AddText(hintGO, "Arrastra estudiantes a cualquier mesa  |  Clic repetido para que salgan  |  Manten clic y mueve para raspar manchas", 19, TextAnchor.MiddleCenter, ColTextoTenue);
+        Place(hintGO.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -94f), new Vector2(1200f, 34f));
+        hud.txtHint = AddText(hintGO, "Junta la misma carrera en cada mesa  |  Carreras distintas = pelea -10%  |  Clic repetido para que salgan", 19, TextAnchor.MiddleCenter, ColTextoTenue);
 
         // Botones
         Button btnBono = MakeButton(canvasT, "BtnBono", "BONO SILENCIO", ColBotonAzul, new Vector2(280f, 92f), 24);
@@ -285,7 +281,40 @@ public static class CubiGameBuilder
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
-        Debug.Log("[CubiCampus] GameScene reconstruida con 8 puestos, fila, HUD y bucle de juego.");
+        Debug.Log("[CubiCampus] GameScene reconstruida con 24 mesas dobles, fila de 4, HUD y bucle de juego.");
+    }
+
+    [MenuItem("Tools/CubiCampus/Agregar Mesa del Profesor")]
+    public static void AddTeacherArea()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+        if (scene.path != ScenePath)
+            scene = EditorSceneManager.OpenScene(ScenePath);
+
+        Transform room = null;
+        GameObject sala = GameObject.Find("Sala");
+        if (sala != null) room = sala.transform;
+
+        CreateTeacherArea(room);
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+
+        Debug.Log("[CubiCampus] Mesa del profesor y placeholder del profesor listos en GameScene.");
+    }
+
+    static void CreateTeacherArea(Transform parent)
+    {
+        if (GameObject.Find("MesaProfesor") == null)
+        {
+            NewSprite("MesaProfesor", parent, new Vector3(3.6f, -4.08f, 0f), new Vector2(2.6f, 1.0f),
+                new Color(0.36f, 0.24f, 0.14f), 2);
+        }
+
+        if (GameObject.Find("Profesor") == null)
+        {
+            NewSprite("Profesor", parent, new Vector3(3.6f, -3.55f, 0f), new Vector2(0.7f, 0.7f),
+                new Color(0.25f, 0.55f, 0.85f), 14);
+        }
     }
 
     // ---------------------------------------------------------------- helpers

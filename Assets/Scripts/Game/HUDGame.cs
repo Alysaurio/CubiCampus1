@@ -146,6 +146,8 @@ public class HUDGame : MonoBehaviour
 
         if (txtAbandonos != null)
             txtAbandonos.text = "ATENDIDOS " + game.Happy + "   ABANDONOS " + game.Abandoned +
+                                "   PELEAS " + game.Fights +
+                                "   SIN CARGA " + game.NoCharger +
                                 "   REUBICACION " + (game.RelocationAvailable ? "SI" : "USADA");
     }
 
@@ -171,7 +173,7 @@ public class HUDGame : MonoBehaviour
 
         string msg = game.Message;
         if (string.IsNullOrEmpty(msg))
-            msg = "Arrastra estudiantes a cualquier mesa  |  Clic repetido para que salgan  |  Manten clic y mueve para raspar manchas";
+            msg = "Misma carrera por mesa  |  Franja de color = exclusiva  |  Rayo = enchufe  |  Clic repetido para salir";
 
         txtHint.text = msg;
     }

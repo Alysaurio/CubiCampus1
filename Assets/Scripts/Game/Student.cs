@@ -15,8 +15,9 @@ public enum StudentState
 }
 
 /// <summary>
-/// Estudiante de la sala. Paciencia en fila, tiempo de estudio, distraccion
-/// y salida. Visual 100% geometrico (cuadrados + barra de estado).
+/// Estudiante de la sala. Cada alumno pertenece a una carrera de Tecsup.
+/// Paciencia en fila, tiempo de estudio, distraccion y salida. Visual 100%
+/// geometrico (cuadrados + etiqueta de carrera + barra de estado).
 /// </summary>
 public class Student : MonoBehaviour
 {
@@ -30,8 +31,12 @@ public class Student : MonoBehaviour
     public bool sharedDouble;
     public bool needsAttention;
     public float attentionLeft;
-    public bool wrongSeat;         // sentado en una mesa que no es la ideal: menos puntos
-    public bool readyPenalized;    // ya se le desconto eficiencia por esperar listo
+    public bool distracted;          // este alumno se distrae a mitad del estudio
+    public bool careerConflict;      // comparte mesa con otra carrera: pelea
+    public bool needsCharge;         // bateria baja: necesita una mesa con enchufe
+    public bool missingCharge;       // esta sentado sin enchufe
+    public bool chargePenalized;     // ya se le desconto eficiencia por no tener cargador
+    public bool readyPenalized;      // ya se le desconto eficiencia por esperar listo
     public Seat seat;
 
     GameManager game;
@@ -44,7 +49,10 @@ public class Student : MonoBehaviour
     SpriteRenderer barFill;
     SpriteRenderer alertBox;
     SpriteRenderer readyBox;
-    SpriteRenderer wrongBox;
+    SpriteRenderer conflictBox;
+    GameObject chargeRoot;
+    SpriteRenderer chargeBody;
+    TextMesh careerLabel;
     Collider2D col;
 
     Coroutine mover;
@@ -52,7 +60,7 @@ public class Student : MonoBehaviour
     float readyTime;
     float bobPhase;
     float packLeft;
-    float packMax = 2.6f;
+    float packMax = 1.4f;
 
     public float PatienceFraction
     {
@@ -68,7 +76,7 @@ public class Student : MonoBehaviour
 
     public static Student Create(StudentProfile profile, Vector3 position, GameManager game, QueueManager queue)
     {
-        GameObject go = new GameObject("Estudiante_" + profile.displayName);
+        GameObject go = new GameObject("Estudiante_" + profile.shortName);
         go.transform.position = position;
 
         Student s = go.AddComponent<Student>();
@@ -89,9 +97,15 @@ public class Student : MonoBehaviour
         bobPhase = Random.Range(0f, 6.28f);
         attentionDone = false;
         needsAttention = false;
-        wrongSeat = false;
+        careerConflict = false;
         readyPenalized = false;
+        sharedDouble = false;
+        needsCharge = g != null && Random.value < g.ChargeChance;
+        missingCharge = false;
+        chargePenalized = false;
+        distracted = g != null && Random.value < g.DistractionChance;
         if (visual == null) BuildVisual();
+        if (chargeRoot != null) chargeRoot.SetActive(needsCharge);
     }
 
     void BuildVisual()
@@ -116,13 +130,16 @@ public class Student : MonoBehaviour
         PixelFactory.Quad("OjoIzq", visual, new Vector3(-0.07f, 0.44f, 0f), new Vector2(0.05f, 0.07f), dark, 13);
         PixelFactory.Quad("OjoDer", visual, new Vector3(0.07f, 0.44f, 0f), new Vector2(0.05f, 0.07f), dark, 13);
 
-        // Icono de requisito
-        Color iconColor = new Color(0.55f, 0.95f, 0.65f);
-        if (profile.requiresOutlet) iconColor = new Color(1f, 0.86f, 0.30f);
-        else if (profile.requiresNoise) iconColor = new Color(1f, 0.62f, 0.28f);
-        else if (profile.requiresSilence) iconColor = new Color(0.45f, 0.85f, 1f);
+        // Franjas de identificacion rapida por carrera (ademas del color).
+        int stripes = ((int)profile.career % 3) + 1;
+        for (int i = 0; i < stripes; i++)
+        {
+            PixelFactory.Quad("Franja" + (i + 1), visual,
+                new Vector3(0f, 0.16f - i * 0.13f, 0f), new Vector2(0.46f, 0.045f),
+                new Color(1f, 1f, 1f, 0.55f), 12);
+        }
 
-        PixelFactory.Quad("Icono", visual, new Vector3(0.26f, 0.20f, 0f), new Vector2(0.16f, 0.16f), iconColor, 13);
+        BuildCareerLabel(dark);
 
         // Barra de paciencia / estudio
         PixelFactory.Quad("BarraFondo", visual, new Vector3(0f, 0.78f, 0f), new Vector2(0.82f, 0.13f), new Color(0.05f, 0.06f, 0.09f, 0.95f), 14);
@@ -136,16 +153,67 @@ public class Student : MonoBehaviour
         readyBox = PixelFactory.Quad("Listo", visual, new Vector3(0f, 1.04f, 0f), new Vector2(0.24f, 0.24f), new Color(0.35f, 1f, 0.55f), 17);
         readyBox.gameObject.SetActive(false);
 
-        // Aviso de que esta en una mesa inadecuada (menos puntos).
-        wrongBox = PixelFactory.Quad("MesaInadecuada", visual, new Vector3(-0.30f, 0.24f, 0f), new Vector2(0.15f, 0.15f),
-            new Color(1f, 0.66f, 0.20f), 13);
-        wrongBox.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
-        wrongBox.gameObject.SetActive(false);
+        // Aviso de pelea: la mesa tiene alumnos de otra carrera.
+        conflictBox = PixelFactory.Quad("Pelea", visual, new Vector3(0.30f, 0.24f, 0f), new Vector2(0.17f, 0.17f),
+            new Color(1f, 0.25f, 0.25f), 13);
+        conflictBox.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+        conflictBox.gameObject.SetActive(false);
+
+        // Bateria baja: icono amarillo que avisa que necesita un enchufe.
+        chargeRoot = new GameObject("Bateria");
+        chargeRoot.transform.SetParent(visual, false);
+        chargeRoot.transform.localPosition = new Vector3(-0.30f, 0.36f, 0f);
+
+        chargeBody = PixelFactory.Quad("BateriaCuerpo", chargeRoot.transform, Vector3.zero,
+            new Vector2(0.13f, 0.19f), new Color(1f, 0.86f, 0.30f), 14);
+        PixelFactory.Quad("BateriaTip", chargeRoot.transform, new Vector3(0f, 0.12f, 0f),
+            new Vector2(0.06f, 0.05f), new Color(1f, 0.86f, 0.30f), 14);
+        PixelFactory.Quad("BateriaRayo", chargeRoot.transform, new Vector3(0f, 0f, 0f),
+            new Vector2(0.035f, 0.10f), new Color(0.25f, 0.22f, 0.10f), 15);
+        chargeRoot.SetActive(false);
 
         BoxCollider2D box = gameObject.AddComponent<BoxCollider2D>();
         box.size = new Vector2(0.8f, 1.2f);
         box.offset = new Vector2(0f, 0.3f);
         col = box;
+    }
+
+    void BuildCareerLabel(Color dark)
+    {
+        GameObject labelGO = new GameObject("Carrera");
+        labelGO.transform.SetParent(visual, false);
+        labelGO.transform.localPosition = new Vector3(0f, -0.02f, 0f);
+
+        careerLabel = labelGO.AddComponent<TextMesh>();
+        careerLabel.text = profile.shortName;
+        careerLabel.anchor = TextAnchor.MiddleCenter;
+        careerLabel.alignment = TextAlignment.Center;
+        careerLabel.fontSize = 64;
+        careerLabel.characterSize = 0.075f;
+        careerLabel.color = new Color(0.05f, 0.06f, 0.09f, 0.88f);
+
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        if (font != null)
+        {
+            careerLabel.font = font;
+            MeshRenderer mr = labelGO.GetComponent<MeshRenderer>();
+            if (mr != null)
+            {
+                mr.sharedMaterial = font.material;
+                mr.sortingOrder = 18;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Marca si el alumno comparte mesa con otra carrera. Lo usa la mesa para
+    /// mantener el aviso de pelea en todos sus ocupantes, no solo en el ultimo.
+    /// </summary>
+    public void SetCareerConflict(bool conflict)
+    {
+        careerConflict = conflict;
+        if (conflictBox != null) conflictBox.gameObject.SetActive(conflict);
     }
 
     // ------------------------------------------------------------------ ciclo
@@ -168,7 +236,7 @@ public class Student : MonoBehaviour
 
             case StudentState.Ready:
                 readyTime += Time.deltaTime;
-                if (readyTime > 20f) Release(false);
+                if (readyTime > 14f) Release(false);
                 break;
 
             case StudentState.Packing:
@@ -197,9 +265,10 @@ public class Student : MonoBehaviour
 
     void TickStudy(float dt)
     {
-        studyLeft -= dt;
+        float speed = missingCharge && game != null ? Mathf.Clamp(game.noChargeStudyFactor, 0.1f, 1f) : 1f;
+        studyLeft -= dt * speed;
 
-        if (profile.distracted && !attentionDone && studyLeft <= studyMax * 0.5f)
+        if (distracted && !attentionDone && studyLeft <= studyMax * 0.5f)
             StartDistraction();
 
         if (needsAttention)
@@ -237,7 +306,7 @@ public class Student : MonoBehaviour
         if (state != StudentState.Ready) return;
 
         state = StudentState.Packing;
-        packMax = game != null ? Mathf.Max(0.5f, game.packDuration) : 2.6f;
+        packMax = game != null ? Mathf.Max(0.4f, game.packDuration) : 1.4f;
         packLeft = packMax;
 
         AudioManager.Play(Sfx.Pack, 0.9f, 1f);
@@ -250,7 +319,7 @@ public class Student : MonoBehaviour
     {
         if (state != StudentState.Packing) return false;
 
-        float power = game != null ? Mathf.Max(0.05f, game.packClickPower) : 0.35f;
+        float power = game != null ? Mathf.Max(0.05f, game.packClickPower) : 0.55f;
         packLeft -= power;
 
         AudioManager.Play(Sfx.Pack, 0.7f, UnityEngine.Random.Range(1.05f, 1.22f));
@@ -274,7 +343,7 @@ public class Student : MonoBehaviour
     {
         attentionDone = true;
         needsAttention = true;
-        attentionLeft = 5f;
+        attentionLeft = 4.5f;
         AudioManager.Play(Sfx.Distraction, 0.85f, UnityEngine.Random.Range(0.95f, 1.05f));
         if (alertBox != null) alertBox.gameObject.SetActive(true);
     }
@@ -329,7 +398,7 @@ public class Student : MonoBehaviour
 
         if (state == StudentState.InQueue)
         {
-            float bob = Mathf.Sin(Time.time * 3f + bobPhase) * 0.035f;
+            float bob = Mathf.Sin(Time.time * 4f + bobPhase) * 0.035f;
             visual.localPosition = new Vector3(0f, bob, 0f);
         }
 
@@ -345,10 +414,27 @@ public class Student : MonoBehaviour
             alertBox.color = new Color(1f, 0.85f, 0.25f, a);
         }
 
-        if (wrongBox != null && wrongBox.gameObject.activeSelf)
+        if (conflictBox != null && conflictBox.gameObject.activeSelf)
         {
-            float a = 0.55f + Mathf.PingPong(Time.time * 3f, 0.45f);
-            wrongBox.color = new Color(1f, 0.66f, 0.20f, a);
+            float a = 0.55f + Mathf.PingPong(Time.time * 6f, 0.45f);
+            conflictBox.color = new Color(1f, 0.25f, 0.25f, a);
+        }
+
+        if (chargeRoot != null && chargeRoot.activeSelf && chargeBody != null)
+        {
+            if (missingCharge)
+            {
+                float a = 0.55f + Mathf.PingPong(Time.time * 6f, 0.45f);
+                chargeBody.color = new Color(1f, 0.22f, 0.22f, a);
+            }
+            else if (seat != null && seat.hasOutlet)
+            {
+                chargeBody.color = new Color(0.35f, 1f, 0.50f);
+            }
+            else
+            {
+                chargeBody.color = new Color(1f, 0.86f, 0.30f);
+            }
         }
     }
 
@@ -374,7 +460,7 @@ public class Student : MonoBehaviour
         state = StudentState.InQueue;
         if (col != null) col.enabled = true;
         game.SetDragOrder(this, false);
-        WalkTo(queuePosition, 8f);
+        WalkTo(queuePosition, 12f);
     }
 
     public void ReturnToSeat()
@@ -382,7 +468,7 @@ public class Student : MonoBehaviour
         state = StudentState.Seated;
         if (col != null) col.enabled = true;
         game.SetDragOrder(this, false);
-        if (seat != null) WalkTo(seat.SpotPosition(Mathf.Max(0, seat.occupants.IndexOf(this))), 8f);
+        if (seat != null) WalkTo(seat.SpotPosition(Mathf.Max(0, seat.occupants.IndexOf(this))), 12f);
     }
 
     public bool AssignTo(Seat s)
@@ -398,16 +484,21 @@ public class Student : MonoBehaviour
         studyLeft = studyMax;
         attentionDone = false;
         needsAttention = false;
-        wrongSeat = !s.MatchesProfile(profile);
+        careerConflict = !s.MatchesProfile(profile);
+        missingCharge = needsCharge && !s.hasOutlet;
+        bool penalizeCharge = missingCharge && !chargePenalized;
+        if (penalizeCharge) chargePenalized = true;
         readyPenalized = false;
         if (alertBox != null) alertBox.gameObject.SetActive(false);
-        if (wrongBox != null) wrongBox.gameObject.SetActive(wrongSeat);
+        if (conflictBox != null) conflictBox.gameObject.SetActive(careerConflict);
         if (readyBox != null) readyBox.gameObject.SetActive(false);
         if (col != null) col.enabled = true;
         game.SetDragOrder(this, false);
 
-        WalkTo(s.SpotPosition(idx), 7f);
+        // Camina rapido a su sitio: el turno ahora es mas agil.
+        WalkTo(s.SpotPosition(idx), 11f);
         game.RegisterAssigned(this);
+        if (penalizeCharge) game.RegisterNoCharger(this);
         return true;
     }
 
@@ -425,12 +516,13 @@ public class Student : MonoBehaviour
             seat = null;
         }
 
+        careerConflict = false;
         game.RegisterHappy(this, PatienceFraction, pair, withBonus);
 
         state = StudentState.Leaving;
         if (col != null) col.enabled = false;
         if (readyBox != null) readyBox.gameObject.SetActive(false);
-        if (wrongBox != null) wrongBox.gameObject.SetActive(false);
+        if (conflictBox != null) conflictBox.gameObject.SetActive(false);
         StartCoroutine(ExitRoutine(new Color(0.55f, 1f, 0.60f)));
     }
 
@@ -450,7 +542,7 @@ public class Student : MonoBehaviour
         state = StudentState.Leaving;
         if (col != null) col.enabled = false;
         if (readyBox != null) readyBox.gameObject.SetActive(false);
-        if (wrongBox != null) wrongBox.gameObject.SetActive(false);
+        if (conflictBox != null) conflictBox.gameObject.SetActive(false);
         StartCoroutine(ExitRoutine(new Color(1f, 0.35f, 0.35f)));
     }
 
@@ -470,7 +562,7 @@ public class Student : MonoBehaviour
         state = StudentState.Leaving;
         if (col != null) col.enabled = false;
         if (alertBox != null) alertBox.gameObject.SetActive(false);
-        if (wrongBox != null) wrongBox.gameObject.SetActive(false);
+        if (conflictBox != null) conflictBox.gameObject.SetActive(false);
         StartCoroutine(ExitRoutine(new Color(1f, 0.65f, 0.30f)));
     }
 
@@ -480,14 +572,14 @@ public class Student : MonoBehaviour
         Vector3 door = game != null ? game.DoorPosition : transform.position + Vector3.down * 3f;
 
         float t = 0f;
-        while (t < 2f)
+        while (t < 1.2f)
         {
             t += Time.deltaTime;
-            transform.position = Vector3.MoveTowards(transform.position, door, 4.5f * Time.deltaTime);
+            transform.position = Vector3.MoveTowards(transform.position, door, 8f * Time.deltaTime);
             if (body != null)
             {
                 Color c = body.color;
-                c.a = Mathf.Lerp(1f, 0.15f, t / 2f);
+                c.a = Mathf.Lerp(1f, 0.15f, t / 1.2f);
                 body.color = c;
             }
             yield return null;

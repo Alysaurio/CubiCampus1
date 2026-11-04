@@ -55,6 +55,28 @@ También puedes asignar:
 
 ---
 
+---
+
+## 3) Enchufes, grupos exclusivos y mesa del profesor
+
+### Enchufes
+- Algunas mesas tienen un **rayo amarillo**: son sitios con cargador.
+- Algunos alumnos llegan con un icono de **bateria** (bateria baja). Si los sientas en una mesa sin enchufe pierden eficiencia y estudian mas lento, asi que conviene llevarlos a una mesa con rayo.
+- Puedes cambiar cuantas mesas tienen enchufe en `RoomLayout.ConfigureLevel` (patron `seatId % 3 == 1`).
+
+### Grupos exclusivos de carrera
+- En cada nivel aparecen pequenos grupos de 2-3 mesas marcadas con una **franja del color de una carrera** y su codigo (MEC, AUT, MKT, MIN, SST o SIM).
+- Esas mesas son exclusivas de esa carrera: si sientas a otra carrera habra pelea y bajara la eficiencia.
+- La seleccion de grupos y carreras se sortea al cargar la escena, asi que **cambia en cada nivel y en cada reintento**.
+
+### Mesa del profesor y sprites reemplazables
+- La sala incluye `MesaProfesor` (rectangulo marron) y `Profesor` (cuadrado azul) como **placeholders**.
+- Para que existan de forma persistente en la escena, ejecuta `Tools > CubiCampus > Agregar Mesa del Profesor` (o reconstruye la escena con `Tools > CubiCampus > Rebuild Game Scene`).
+- Luego selecciona `MesaProfesor` o `Profesor` en la Hierarchy y arrastra tu sprite al campo `Sprite` del `SpriteRenderer`. El juego respeta esos objetos y no los reemplaza al iniciar.
+- Si tu sprite tiene otra escala, ajusta `Transform > Scale` del objeto (`MesaProfesor` usa 2.6 x 1.0 y `Profesor` 0.7 x 0.7).
+
+---
+
 ## Consejos
 - Usa `Resources/Audio/AudioConfig.asset` con ese nombre exacto para que se cargue automáticamente.
 - Guarda los prefabs en `Assets/Prefabs/`

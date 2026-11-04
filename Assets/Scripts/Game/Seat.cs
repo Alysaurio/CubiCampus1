@@ -29,6 +29,17 @@ public class Seat : MonoBehaviour
     public bool pairBonus;
     public float contaminatedUntil;
 
+    [Header("Pelea de carreras")]
+    public bool fightActive;
+    public float fightTimer;
+
+    [Header("Grupo exclusivo de carrera")]
+    public bool exclusive;
+    public Career exclusiveCareer;
+    public Transform groupRoot;
+    public TextMesh groupLabel;
+    public SpriteRenderer groupBand;
+
     [Header("Limpieza")]
     [Tooltip("Distancia total de arrastre (unidades de mundo) para quitar una mancha completa.")]
     public float scrubDistance = 2.2f;
@@ -61,6 +72,57 @@ public class Seat : MonoBehaviour
         {
             return !blocked && !dirty && !cleaning && !IsCondemned && occupants.Count < capacity;
         }
+    }
+
+    /// <summary>
+    /// Hay conflicto si la mesa es exclusiva de una carrera y alguien de otra
+    /// carrera se sienta, o si dos ocupantes tienen carreras distintas.
+    /// </summary>
+    public bool HasCareerConflict
+    {
+        get
+        {
+            if (exclusive)
+            {
+                for (int i = 0; i < occupants.Count; i++)
+                {
+                    Student o = occupants[i];
+                    if (o == null || o.profile == null) continue;
+                    if (o.profile.career != exclusiveCareer) return true;
+                }
+            }
+
+            if (occupants.Count < 2) return false;
+
+            Career first = occupants[0] != null && occupants[0].profile != null
+                ? occupants[0].profile.career
+                : Career.MecatronicaIndustrial;
+
+            for (int i = 1; i < occupants.Count; i++)
+            {
+                Student o = occupants[i];
+                if (o == null || o.profile == null) continue;
+                if (o.profile.career != first) return true;
+            }
+            return false;
+        }
+    }
+
+    bool AllOccupantsSameCareer()
+    {
+        if (occupants.Count == 0) return true;
+
+        Career first = occupants[0] != null && occupants[0].profile != null
+            ? occupants[0].profile.career
+            : Career.MecatronicaIndustrial;
+
+        for (int i = 1; i < occupants.Count; i++)
+        {
+            Student o = occupants[i];
+            if (o == null || o.profile == null) continue;
+            if (o.profile.career != first) return false;
+        }
+        return true;
     }
 
     public bool HasReadyOccupant
@@ -101,13 +163,9 @@ public class Seat : MonoBehaviour
         highlightBorder = PixelFactory.Quad("BordeHL", highlightRoot.transform, Vector3.zero, size * 1.08f, new Color(0.3f, 1f, 0.45f), 1);
         highlightRoot.SetActive(false);
 
-        // Enchufe (rayo) en la esquina
-        if (hasOutlet)
-        {
-            outletIcon = PixelFactory.Quad("Enchufe", transform,
-                new Vector3(size.x * 0.5f - 0.18f, size.y * 0.5f - 0.18f, 0f),
-                new Vector2(0.20f, 0.20f), new Color(1f, 0.86f, 0.30f), 5);
-        }
+        // Enchufe (rayo) en la esquina. Se crea aqui y tambien puede activarse
+        // despues desde RoomLayout con SetOutlet.
+        if (hasOutlet) BuildOutletIcon();
 
         // Marca de zona de ruido
         if (kind == SeatKind.Ruido)
@@ -135,6 +193,95 @@ public class Seat : MonoBehaviour
         BuildBlocker();
         BuildDirt();
         RefreshVisual();
+    }
+
+    // ------------------------------------------------------------------ enchufe
+
+    void BuildOutletIcon()
+    {
+        if (outletIcon != null) return;
+
+        // Rayo amarillo simple: cuerpo + punta.
+        Color amarillo = new Color(1f, 0.86f, 0.30f);
+        outletIcon = PixelFactory.Quad("Enchufe", transform,
+            new Vector3(size.x * 0.5f - 0.22f, size.y * 0.5f - 0.20f, 0f),
+            new Vector2(0.24f, 0.24f), amarillo, 6);
+
+        PixelFactory.Quad("Rayo1", outletIcon.transform, new Vector3(0f, 0f, 0f),
+            new Vector2(0.25f, 0.5f), new Color(0.25f, 0.22f, 0.10f), 6);
+    }
+
+    public void SetOutlet(bool value)
+    {
+        hasOutlet = value;
+        if (value) BuildOutletIcon();
+        if (outletIcon != null) outletIcon.gameObject.SetActive(value);
+    }
+
+    // ------------------------------------------------------------------ grupo de carrera
+
+    /// <summary>
+    /// Marca la mesa como parte de un pequeno grupo exclusivo de una carrera.
+    /// La franja de color y la etiqueta permiten verlo de un vistazo.
+    /// </summary>
+    public void SetCareerGroup(bool active, Career career)
+    {
+        exclusive = active;
+        exclusiveCareer = career;
+
+        if (!active)
+        {
+            if (groupRoot != null) groupRoot.gameObject.SetActive(false);
+            return;
+        }
+
+        if (groupRoot == null) BuildGroupMarker();
+
+        groupRoot.gameObject.SetActive(true);
+        Color c = StudentProfile.ColorOf(career);
+        if (groupBand != null) groupBand.color = c;
+        if (groupLabel != null)
+        {
+            groupLabel.text = StudentProfile.ShortCode(career);
+            groupLabel.color = new Color(0.06f, 0.07f, 0.10f, 0.95f);
+        }
+        RefreshVisual();
+    }
+
+    void BuildGroupMarker()
+    {
+        GameObject root = new GameObject("GrupoCarrera");
+        root.transform.SetParent(transform, false);
+        groupRoot = root.transform;
+
+        float y = size.y * 0.5f - 0.13f;
+        groupBand = PixelFactory.Quad("GrupoFranja", groupRoot,
+            new Vector3(0f, y, 0f), new Vector2(size.x * 0.96f, 0.20f),
+            new Color(1f, 1f, 1f, 0.95f), 5);
+
+        GameObject labelGO = new GameObject("GrupoTexto");
+        labelGO.transform.SetParent(groupRoot, false);
+        labelGO.transform.localPosition = new Vector3(0f, y, 0f);
+
+        groupLabel = labelGO.AddComponent<TextMesh>();
+        groupLabel.anchor = TextAnchor.MiddleCenter;
+        groupLabel.alignment = TextAlignment.Center;
+        groupLabel.fontSize = 64;
+        groupLabel.characterSize = 0.055f;
+        groupLabel.color = new Color(0.06f, 0.07f, 0.10f, 0.95f);
+
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        if (font != null)
+        {
+            groupLabel.font = font;
+            MeshRenderer mr = labelGO.GetComponent<MeshRenderer>();
+            if (mr != null)
+            {
+                mr.sharedMaterial = font.material;
+                mr.sortingOrder = 7;
+            }
+        }
     }
 
     void BuildBlocker()
@@ -263,10 +410,16 @@ public class Seat : MonoBehaviour
             cFill = new Color(0.22f, 0.30f, 0.42f);
             cBorder = new Color(0.55f, 0.90f, 1f);
         }
+        else if (fightActive)
+        {
+            cFill = new Color(0.34f, 0.10f, 0.10f);
+            cBorder = new Color(1f, 0.25f, 0.25f);
+        }
 
         fill.color = cFill;
         border.color = cBorder;
 
+        if (fightActive) border.color = new Color(1f, 0.25f, 0.25f);
         if (highlight == 1) border.color = new Color(0.30f, 1f, 0.45f);        // compatible
         else if (highlight == 2) border.color = new Color(1f, 0.25f, 0.25f);   // no se puede
         else if (highlight == 3) border.color = new Color(1f, 0.78f, 0.25f);   // se puede, pero inadecuada
@@ -275,6 +428,13 @@ public class Seat : MonoBehaviour
         if (blockerRoot != null) blockerRoot.gameObject.SetActive(blocked);
         RefreshDirt();
         if (outletIcon != null) outletIcon.gameObject.SetActive(hasOutlet);
+    }
+
+    public void SetFighting(bool fighting)
+    {
+        fightActive = fighting;
+        if (!fighting) fightTimer = 0f;
+        RefreshVisual();
     }
 
     // ------------------------------------------------------------------ logica
@@ -315,6 +475,12 @@ public class Seat : MonoBehaviour
             highlightBorder.color = c;
         }
 
+        if (fightActive && border != null)
+        {
+            float p = 0.55f + Mathf.PingPong(Time.time * 6f, 0.45f);
+            border.color = new Color(1f, 0.25f * p, 0.25f * p);
+        }
+
         if (blocked)
         {
             if (cleaning)
@@ -346,7 +512,7 @@ public class Seat : MonoBehaviour
 
     /// <summary>
     /// Ahora cualquier mesa libre acepta alumnos. La "compatibilidad" ya no bloquea
-    /// la asignacion: si la mesa no es la adecuada se gana menos puntaje.
+    /// la asignacion: solo importa la carrera de quien ya esta sentado.
     /// </summary>
     public bool CanAccept(StudentProfile p)
     {
@@ -354,16 +520,21 @@ public class Seat : MonoBehaviour
         return IsFree;
     }
 
-    /// <summary>La mesa es la ideal para ese perfil (silencio/enchufe/zona de ruido).</summary>
+    /// <summary>
+    /// La mesa es ideal si no es de otra carrera, si el alumno no necesita
+    /// enchufe (o la mesa lo tiene) y si todos sus ocupantes son de la misma carrera.
+    /// </summary>
     public bool MatchesProfile(StudentProfile p)
     {
+        return MatchesProfile(p, false);
+    }
+
+    public bool MatchesProfile(StudentProfile p, bool needsCharge)
+    {
         if (p == null) return false;
-
-        if (p.requiresNoise) return kind == SeatKind.Ruido;
-        if (kind == SeatKind.Ruido) return false;
-        if (p.requiresOutlet && !hasOutlet) return false;
-
-        return true;
+        if (exclusive && p.career != exclusiveCareer) return false;
+        if (needsCharge && !hasOutlet) return false;
+        return AllOccupantsSameCareer() && !HasCareerConflict;
     }
 
     public string RejectReason(StudentProfile p)
@@ -372,16 +543,26 @@ public class Seat : MonoBehaviour
         if (dirty) return "Mesa sucia: manten clic y mueve para limpiar";
         if (IsCondemned) return "Mesa contaminada por un apartado";
         if (occupants.Count >= capacity) return "Mesa ocupada";
-        if (p != null && !MatchesProfile(p)) return MismatchReason(p);
         return "No disponible";
     }
 
     public string MismatchReason(StudentProfile p)
     {
+        return MismatchReason(p, false);
+    }
+
+    public string MismatchReason(StudentProfile p, bool needsCharge)
+    {
         if (p == null) return "Mesa inadecuada";
-        if (p.requiresNoise && kind != SeatKind.Ruido) return "El grupo necesita zona de ruido";
-        if (!p.requiresNoise && kind == SeatKind.Ruido) return "La zona de ruido es solo para grupos";
-        if (p.requiresOutlet && !hasOutlet) return "Esta mesa no tiene enchufe";
+
+        if (exclusive && p.career != exclusiveCareer)
+            return "Mesa exclusiva de " + StudentProfile.ShortCode(exclusiveCareer) +
+                   ": se pelearan (-10% eficiencia)";
+
+        if (needsCharge && !hasOutlet)
+            return "Bateria baja: necesita una mesa con enchufe";
+
+        if (HasCareerConflict) return "Mesa con otra carrera: se pelearan (-10% eficiencia)";
         return "Mesa inadecuada";
     }
 
@@ -390,27 +571,18 @@ public class Seat : MonoBehaviour
         return transform.position + new Vector3(SpotOffsetX(index), -0.05f, 0f);
     }
 
-    /// <summary>Desplazamiento local de cada hueco (0 = izquierda, 1 = derecha en la mesa doble).</summary>
+    /// <summary>Desplazamiento local de cada hueco (0 = izquierda, 1 = derecha).</summary>
     public float SpotOffsetX(int index)
     {
         if (capacity <= 1) return 0f;
-        float step = size.x * 0.42f;
+        float step = size.x * 0.27f;
         return index <= 0 ? -step : step;
     }
 
     public int AddOccupant(Student s)
     {
         occupants.Add(s);
-        pairBonus = (kind == SeatKind.Doble && occupants.Count >= 2);
-
-        if (kind == SeatKind.Doble)
-        {
-            for (int i = 0; i < occupants.Count; i++)
-            {
-                if (occupants[i] != null) occupants[i].sharedDouble = true;
-            }
-        }
-
+        RefreshPairState();
         RefreshVisual();
         return occupants.Count - 1;
     }
@@ -421,7 +593,7 @@ public class Seat : MonoBehaviour
         if (idx < 0) return;
 
         occupants.RemoveAt(idx);
-        pairBonus = (kind == SeatKind.Doble && occupants.Count >= 2);
+        RefreshPairState();
 
         // Reacomoda a quien se queda: si el que salio era el de la izquierda,
         // el otro debe correrse a ese hueco para que no queden dos alumnos encima.
@@ -430,10 +602,26 @@ public class Seat : MonoBehaviour
             Student o = occupants[i];
             if (o == null) continue;
             if (o.state == StudentState.Seated || o.state == StudentState.Ready || o.state == StudentState.Packing)
-                o.WalkTo(SpotPosition(i), 6f);
+                o.WalkTo(SpotPosition(i), 10f);
         }
 
         RefreshVisual();
+    }
+
+    void RefreshPairState()
+    {
+        bool shared = capacity > 1;
+        bool sameCareer = AllOccupantsSameCareer();
+        bool conflict = HasCareerConflict;
+        pairBonus = shared && occupants.Count >= 2 && sameCareer && !conflict;
+
+        for (int i = 0; i < occupants.Count; i++)
+        {
+            Student o = occupants[i];
+            if (o == null) continue;
+            o.sharedDouble = shared;
+            o.SetCareerConflict(conflict);
+        }
     }
 
     public void MarkDirty()

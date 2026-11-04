@@ -231,7 +231,7 @@ public class DragAssigner : MonoBehaviour
 
             if (s.CanAccept(st.profile))
             {
-                s.SetDragHighlight(true, s.MatchesProfile(st.profile));
+                s.SetDragHighlight(true, s.MatchesProfile(st.profile, st.needsCharge));
             }
             else
             {
@@ -278,7 +278,7 @@ public class DragAssigner : MonoBehaviour
         }
         else
         {
-            bool ideal = seat.MatchesProfile(dragging.profile);
+            bool ideal = seat.MatchesProfile(dragging.profile, dragging.needsCharge);
             seat.SetDragHighlight(true, ideal);
             seat.SetHighlight(ideal ? 1 : 3);
         }
@@ -303,13 +303,13 @@ public class DragAssigner : MonoBehaviour
 
         if (CanDropOn(st, seat))
         {
-            bool ideal = seat.MatchesProfile(st.profile);
+            bool ideal = seat.MatchesProfile(st.profile, st.needsCharge);
 
             if (relocateMode) game.RegisterRelocate();
             st.AssignTo(seat);
 
-            if (ideal) game.SetMessage("Asignado a " + seatName(seat), 1.2f);
-            else game.SetMessage("Mesa inadecuada: menos puntos (" + seat.MismatchReason(st.profile) + ")", 2f);
+            if (ideal) game.SetMessage("Asignado a " + seatName(seat) + " (" + st.profile.shortName + ")", 1.2f);
+            else game.SetMessage(seat.MismatchReason(st.profile, st.needsCharge), 2.2f);
             return;
         }
 
@@ -339,12 +339,7 @@ public class DragAssigner : MonoBehaviour
 
     string seatName(Seat s)
     {
-        switch (s.kind)
-        {
-            case SeatKind.Doble: return "mesa doble";
-            case SeatKind.Ruido: return "zona de ruido";
-            default: return "cubico " + s.seatId;
-        }
+        return "la mesa " + s.seatId;
     }
 
     void ClearHover()

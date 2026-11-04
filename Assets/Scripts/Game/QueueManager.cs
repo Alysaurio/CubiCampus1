@@ -1,9 +1,9 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Genera estudiantes y gestiona la fila FIFO de 3 puestos visibles.
+/// Genera estudiantes de las seis carreras de Tecsup y gestiona la fila FIFO
+/// de 4 puestos visibles. El ritmo es mucho mas rapido que en la version anterior.
 /// </summary>
 public class QueueManager : MonoBehaviour
 {
@@ -16,17 +16,11 @@ public class QueueManager : MonoBehaviour
     public GameObject estudiantePrefab;
 
     [Header("Balance")]
-    public float spawnInterval = 8f;
-    public float firstSpawnDelay = 1.2f;
+    public float spawnInterval = 2.6f;
+    public float firstSpawnDelay = 0.6f;
 
-    [Range(0f, 1f)] public float weightLector = 0.34f;
-    [Range(0f, 1f)] public float weightTesis = 0.18f;
-    [Range(0f, 1f)] public float weightGrupo = 0.26f;
-    [Range(0f, 1f)] public float weightDespistado = 0.22f;
-
-    [Header("Progresion")]
-    [Tooltip("Maximo de despistados a la vez entre fila y mesas (2 en los dias 8-10).")]
-    public int maxDistracted = 1;
+    [Header("Peso de cada carrera")]
+    public float[] careerWeights = { 1f, 1f, 1f, 1f, 1f, 1f };
 
     public List<Student> Students { get { return students; } }
 
@@ -56,24 +50,24 @@ public class QueueManager : MonoBehaviour
     float SpawnInterval()
     {
         float interval = spawnInterval;
-        if (game != null && game.IsRush) interval /= 1.5f;
-        return Mathf.Max(2.5f, interval);
+        if (game != null && game.IsRush) interval /= 1.8f;
+        return Mathf.Max(1.4f, interval);
     }
 
     public Student SpawnRandom()
     {
-        StudentKind kind = PickKind();
-        return Spawn(kind);
+        Career career = PickCareer();
+        return Spawn(career);
     }
 
-    public Student Spawn(StudentKind kind)
+    public Student Spawn(Career career)
     {
         if (slots == null || slots.Length == 0) return null;
 
-        StudentProfile profile = game.GetProfile(kind);
-        if (profile == null) profile = StudentProfile.Create(kind);
+        StudentProfile profile = game.GetProfile(career);
+        if (profile == null) profile = StudentProfile.Create(career);
 
-        Vector3 spawnPos = doorPoint != null ? doorPoint.position : new Vector3(-6f, -3.5f, 0f);
+        Vector3 spawnPos = doorPoint != null ? doorPoint.position : new Vector3(-8f, -3.7f, 0f);
         Student s = null;
 
         if (estudiantePrefab != null)
@@ -91,7 +85,7 @@ public class QueueManager : MonoBehaviour
         students.Add(s);
         int index = students.Count - 1;
         Vector3 target = SlotPosition(index);
-        s.WalkTo(target, 5.5f);
+        s.WalkTo(target, 9f);
 
         game.RegisterArrival(s);
         return s;
@@ -106,7 +100,7 @@ public class QueueManager : MonoBehaviour
         {
             if (students[i] == null) continue;
             if (students[i].state == StudentState.InQueue)
-                students[i].WalkTo(SlotPosition(i), 6.5f);
+                students[i].WalkTo(SlotPosition(i), 10f);
         }
     }
 
@@ -117,76 +111,23 @@ public class QueueManager : MonoBehaviour
         return slots[i] != null ? slots[i].position : Vector3.zero;
     }
 
-    StudentKind PickKind()
+    Career PickCareer()
     {
-        float total = weightLector + weightTesis + weightGrupo + weightDespistado;
-        if (total <= 0f) return StudentKind.Lector;
+        float total = 0f;
+        int count = Mathf.Min(careerWeights != null ? careerWeights.Length : 0, StudentProfile.AllCareers.Length);
+        for (int i = 0; i < count; i++) total += Mathf.Max(0f, careerWeights[i]);
+
+        if (total <= 0f)
+            return StudentProfile.AllCareers[Random.Range(0, StudentProfile.AllCareers.Length)];
 
         float r = Random.value * total;
-        StudentKind kind;
-        if (r < weightLector) kind = StudentKind.Lector;
-        else
+        for (int i = 0; i < count; i++)
         {
-            r -= weightLector;
-            if (r < weightTesis) kind = StudentKind.Tesis;
-            else
-            {
-                r -= weightTesis;
-                kind = r < weightGrupo ? StudentKind.GrupoRuidoso : StudentKind.Despistado;
-            }
+            float w = Mathf.Max(0f, careerWeights[i]);
+            if (r < w) return StudentProfile.AllCareers[i];
+            r -= w;
         }
 
-        // Limite de despistados simultaneos: si ya hay el maximo, llega otro tipo.
-        if (kind == StudentKind.Despistado && maxDistracted > 0 && CountDistracted() >= maxDistracted)
-            kind = PickNonDistracted();
-
-        return kind;
-    }
-
-    StudentKind PickNonDistracted()
-    {
-        float total = weightLector + weightTesis + weightGrupo;
-        if (total <= 0f) return StudentKind.Lector;
-
-        float r = Random.value * total;
-        if (r < weightLector) return StudentKind.Lector;
-        r -= weightLector;
-        if (r < weightTesis) return StudentKind.Tesis;
-        return StudentKind.GrupoRuidoso;
-    }
-
-    /// <summary>Despistados vivos entre la fila y las mesas.</summary>
-    int CountDistracted()
-    {
-        int n = 0;
-
-        for (int i = 0; i < students.Count; i++)
-        {
-            Student s = students[i];
-            if (IsCountableDistracted(s)) n++;
-        }
-
-        if (game != null)
-        {
-            for (int i = 0; i < game.seats.Count; i++)
-            {
-                Seat st = game.seats[i];
-                if (st == null) continue;
-                for (int j = 0; j < st.occupants.Count; j++)
-                {
-                    if (IsCountableDistracted(st.occupants[j])) n++;
-                }
-            }
-        }
-
-        return n;
-    }
-
-    static bool IsCountableDistracted(Student s)
-    {
-        if (s == null || s.profile == null) return false;
-        if (s.profile.kind != StudentKind.Despistado) return false;
-        if (s.state == StudentState.Leaving || s.state == StudentState.Gone) return false;
-        return true;
+        return StudentProfile.AllCareers[count - 1];
     }
 }
