@@ -213,6 +213,12 @@ public static class CubiGameBuilder
         Place(abGO.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(40f, 28f), new Vector2(1200f, 36f));
         hud.txtAbandonos = AddText(abGO, "ATENDIDOS 0   ABANDONOS 0   PELEAS 0", 21, TextAnchor.MiddleLeft, ColTextoTenue);
 
+        GameObject fpsGO = NewUI("TxtFPS", canvasT);
+        Place(fpsGO.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-40f, -140f), new Vector2(120f, 36f));
+        Text txtFPS = AddText(fpsGO, "FPS 60", 24, TextAnchor.MiddleRight, Color.white);
+        txtFPS.fontStyle = FontStyle.Bold;
+        hud.txtFPS = txtFPS;
+
         
 
         // Botones

@@ -22,6 +22,7 @@ public class HUDGame : MonoBehaviour
     public Text txtRush;
     public Text txtEstado;
     public Text txtBono;
+    public Text txtFPS;
 
     [Header("Barras")]
     public Image barraTiempo;
@@ -65,6 +66,7 @@ public class HUDGame : MonoBehaviour
         UpdateBono();
         UpdateAlert();
         UpdateInput();
+        UpdateFPS();
     }
 
     void UpdateClock()
@@ -238,8 +240,29 @@ public class HUDGame : MonoBehaviour
         SceneManager.LoadScene("MenuScene");
     }
 
-    public void ShowEnd()
+    float fpsTimer;
+    float fpsAccum;
+    int fpsFrames;
+
+    void UpdateFPS()
     {
+        if (txtFPS == null) return;
+
+        fpsAccum += Time.unscaledDeltaTime;
+        fpsFrames++;
+        fpsTimer += Time.unscaledDeltaTime;
+
+        if (fpsTimer >= 0.5f)
+        {
+            int fps = fpsFrames > 0 ? Mathf.RoundToInt(fpsFrames / fpsAccum) : 0;
+            txtFPS.text = "FPS " + fps;
+            fpsAccum = 0f;
+            fpsFrames = 0;
+            fpsTimer = 0f;
+        }
+    }
+
+    public void ShowEnd()    {
         if (panelPausa != null) panelPausa.SetActive(false);
         if (txtEstado != null)
         {
