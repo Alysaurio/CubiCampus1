@@ -20,7 +20,6 @@ public class HUDGame : MonoBehaviour
     public Text txtAbandonos;
     public Text txtCombo;
     public Text txtRush;
-    public Text txtHint;
     public Text txtEstado;
     public Text txtBono;
 
@@ -63,7 +62,6 @@ public class HUDGame : MonoBehaviour
         UpdateDia();
         UpdateAforo();
         UpdateCombo();
-        UpdateHint();
         UpdateBono();
         UpdateAlert();
         UpdateInput();
@@ -165,17 +163,6 @@ public class HUDGame : MonoBehaviour
             txtCombo.text = "RACHA " + game.PerfectStreak + " / 3";
             txtCombo.color = new Color(0.70f, 0.74f, 0.85f);
         }
-    }
-
-    void UpdateHint()
-    {
-        if (txtHint == null) return;
-
-        string msg = game.Message;
-        if (string.IsNullOrEmpty(msg))
-            msg = "Misma carrera por mesa  |  Franja de color = exclusiva  |  Rayo = enchufe  |  Clic repetido para salir";
-
-        txtHint.text = msg;
     }
 
     void UpdateBono()

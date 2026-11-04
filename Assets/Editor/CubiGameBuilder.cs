@@ -213,9 +213,7 @@ public static class CubiGameBuilder
         Place(abGO.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(40f, 28f), new Vector2(1200f, 36f));
         hud.txtAbandonos = AddText(abGO, "ATENDIDOS 0   ABANDONOS 0   PELEAS 0", 21, TextAnchor.MiddleLeft, ColTextoTenue);
 
-        GameObject hintGO = NewUI("TxtHint", canvasT);
-        Place(hintGO.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -94f), new Vector2(1200f, 34f));
-        hud.txtHint = AddText(hintGO, "Junta la misma carrera en cada mesa  |  Carreras distintas = pelea -10%  |  Clic repetido para que salgan", 19, TextAnchor.MiddleCenter, ColTextoTenue);
+        
 
         // Botones
         Button btnBono = MakeButton(canvasT, "BtnBono", "BONO SILENCIO", ColBotonAzul, new Vector2(280f, 92f), 24);
@@ -312,6 +310,7 @@ public static class CubiGameBuilder
 
         if (GameObject.Find("Profesor") == null)
         {
+            NewSprite("Profesor", parent, new Vector3(3.6f, -3.62f, 0f), new Vector2(0.7f, 0.7f),
                 new Color(0.25f, 0.55f, 0.85f), 14);
         }
     }
