@@ -268,10 +268,16 @@ public static class RoomLayout
             s.SetOutlet((s.seatId % 3) == 1);
         }
 
-        // Desde el primer dia hay al menos 2 grupos para que se note la variedad;
-        // en los dias con mas mesas se llega a 3 grupos.
-        int groups = Mathf.Clamp(Mathf.CeilToInt(active / 7f), 1, 3);
+        // Limite proporcional: solo el 20% de las mesas activas puede formar grupos.
+        int maxGroupsByTables = Mathf.Max(1, Mathf.CeilToInt(active * 0.2f));
 
+        // Una carrera no puede tener mas de un grupo (dos a partir del nivel 5).
+        int groupsPerCareerMax = (game.diaActual >= 5) ? 2 : 1;
+        int maxGroupsByCareers = StudentProfile.AllCareers.Length * groupsPerCareerMax;
+
+        int groups = Mathf.Min(maxGroupsByTables, maxGroupsByCareers);
+
+        // Mezcla las carreras para variar el orden de asignacion.
         List<Career> careers = new List<Career>(StudentProfile.AllCareers);
         for (int i = careers.Count - 1; i > 0; i--)
         {
@@ -280,6 +286,10 @@ public static class RoomLayout
             careers[i] = careers[j];
             careers[j] = tmp;
         }
+
+        // Contador de grupos asignados por carrera (para no repetir carrera).
+        int[] careerGroupCount = new int[StudentProfile.AllCareers.Length];
+        int careerIdx = 0;
 
         // Orden de formas para este nivel: primero las que NO se usaron en los
         // ultimos niveles, para que un reintento nunca repita el grupo anterior.
@@ -309,11 +319,31 @@ public static class RoomLayout
 
         for (int g = 0; g < groups; g++)
         {
+            // Busca la siguiente carrera que no haya alcanzado su limite de grupos.
+            Career career = Career.MecatronicaIndustrial;
+            int chosenCareerIdx = -1;
+            for (int attempt = 0; attempt < careers.Count; attempt++)
+            {
+                int ci = (careerIdx + attempt) % careers.Count;
+                Career c = careers[ci];
+                int careerIndex = (int)c;
+                if (careerGroupCount[careerIndex] < groupsPerCareerMax)
+                {
+                    career = c;
+                    chosenCareerIdx = ci;
+                    careerIdx = (ci + 1) % careers.Count;
+                    break;
+                }
+            }
+            if (chosenCareerIdx < 0) break; // Ninguna carrera disponible.
+
             List<int> group = PickGroupCells(cells, rows, cols, used, shapeOrder,
                                              usedShapeIndices, usedSizes);
             if (group == null) break;
 
-            Career career = careers[g % careers.Count];
+            // Marcar la carrera como usada solo si el grupo se creo.
+            careerGroupCount[(int)career]++;
+
             for (int k = 0; k < group.Count; k++)
             {
                 Seat s = game.seats[group[k]];
