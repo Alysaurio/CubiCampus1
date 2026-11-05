@@ -53,6 +53,12 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
     public int floorRows = 7;
     public float floorStartY = 2.0f;
 
+    [Header("Material y tinte de piso")]
+    [Tooltip("Material Sprite-Lit-Default. Se asigna a los sprites creados en runtime para que la luz 2D funcione igual en editor y build.")]
+    public Material spriteLitMaterial;
+    [Tooltip("Tinte del suelo: mas oscuro y algo transparente para dar contraste a mesas y alumnos.")]
+    public Color floorTint = new Color(0.72f, 0.70f, 0.74f, 0.90f);
+
     [Header("Iluminación 2D URP")]
     public Color globalLightColor = new Color(1.0f, 0.957f, 0.902f, 1.0f); // #FFF4E6
     [Range(0.1f, 2.0f)] public float globalLightIntensity = 0.68f;
@@ -144,6 +150,10 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         if (classroomWall == null) classroomWall = AssetDatabase.LoadAssetAtPath<Sprite>(baseDir + "Classroom_wall.png");
         if (classroomFloor == null) classroomFloor = AssetDatabase.LoadAssetAtPath<Sprite>(baseDir + "Classroom_floor.png");
 
+        if (spriteLitMaterial == null)
+            spriteLitMaterial = AssetDatabase.LoadAssetAtPath<Material>(
+                "Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Lit-Default.mat");
+
         string trimDir = baseDir + "Trim/";
         if (trimTop == null) trimTop = AssetDatabase.LoadAssetAtPath<Sprite>(trimDir + "spr_wood_trim_top.png");
         if (trimBottom == null) trimBottom = AssetDatabase.LoadAssetAtPath<Sprite>(trimDir + "spr_wood_trim_bottom.png");
@@ -208,7 +218,8 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
 
             SpriteRenderer sr = wallGO.AddComponent<SpriteRenderer>();
             sr.sprite = classroomWall;
-            sr.sortingOrder = -20;
+            sr.sortingOrder = RenderOrder.Floor;
+            ApplyLitMaterial(sr);
         }
 
         // 2. Filas inferiores: Classroom_floor (32x32 px -> 1x1 unidad)
@@ -224,7 +235,9 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
 
                 SpriteRenderer sr = floorGO.AddComponent<SpriteRenderer>();
                 sr.sprite = classroomFloor;
-                sr.sortingOrder = -20;
+                sr.color = floorTint;
+                sr.sortingOrder = RenderOrder.Floor;
+                ApplyLitMaterial(sr);
             }
         }
     }
@@ -244,7 +257,7 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
             ClearChildren(trimRoot);
         }
 
-        int order = -18;
+        int order = RenderOrder.Trim;
 
         // 4 Esquinas
         CreateTrimTile("Trim_C_Down_Left", trimRoot, new Vector3(minCol, 4.0f, 0f), trimCornerDownLeft, order);
@@ -282,6 +295,28 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = sprite;
         sr.sortingOrder = order;
+        ApplyLitMaterial(sr);
+    }
+
+    Material GetSpriteLitMaterial()
+    {
+        if (spriteLitMaterial == null)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/2D/Sprite-Lit-Default");
+            if (shader != null)
+            {
+                spriteLitMaterial = new Material(shader);
+                spriteLitMaterial.hideFlags = HideFlags.DontSave;
+            }
+        }
+        return spriteLitMaterial;
+    }
+
+    void ApplyLitMaterial(SpriteRenderer sr)
+    {
+        if (sr == null) return;
+        Material mat = GetSpriteLitMaterial();
+        if (mat != null) sr.sharedMaterial = mat;
     }
 
     // ------------------------------------------------------------------ TAREA 3: PUERTA, PROFESOR, PIZARRA Y DECORACIONES
@@ -383,6 +418,7 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = sprite;
         sr.sortingOrder = order;
+        ApplyLitMaterial(sr);
     }
 
     void SetupTeacherArea(float deskX, float deskY)
@@ -397,7 +433,8 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
             {
                 sr.sprite = mainDesk;
                 sr.color = Color.white;
-                sr.sortingOrder = 2;
+                sr.sortingOrder = RenderOrder.Table;
+                ApplyLitMaterial(sr);
             }
         }
 
@@ -417,6 +454,7 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
                 if (profeSprite != null) sr.sprite = profeSprite;
                 sr.color = Color.white;
                 sr.sortingOrder = 4;
+                ApplyLitMaterial(sr);
             }
             if (teacherT.GetComponent<TeacherIdleAnimation>() == null)
             {
@@ -582,7 +620,16 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         if (srMesa == null) srMesa = visualT.gameObject.AddComponent<SpriteRenderer>();
         srMesa.sprite = mesaSprite;
         srMesa.color = Color.white;
-        srMesa.sortingOrder = 0;
+        srMesa.sortingOrder = RenderOrder.Table;
+        ApplyLitMaterial(srMesa);
+
+        Seat seat = mesaT.GetComponent<Seat>();
+        if (seat != null)
+        {
+            seat.highlightVisual = visualT;
+            Transform oldHighlight = mesaT.Find("HighlightDrag");
+            if (oldHighlight != null) DestroyObjectSafe(oldHighlight.gameObject);
+        }
 
         // 2. Desactivar renderers rectangulares antiguos de Borde y Cuerpo
         Transform cuerpo = mesaT.Find("Cuerpo");
@@ -617,7 +664,8 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
             var srIzq = sIzq.GetComponent<SpriteRenderer>();
             if (srIzq == null) srIzq = sIzq.gameObject.AddComponent<SpriteRenderer>();
             srIzq.sprite = sillas[Random.Range(0, sillas.Length)];
-            srIzq.sortingOrder = 2;
+            srIzq.sortingOrder = RenderOrder.Chair;
+            ApplyLitMaterial(srIzq);
 
             // Silla Derecha
             Transform sDer = mesaT.Find("Silla_Der");
@@ -632,7 +680,8 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
             var srDer = sDer.GetComponent<SpriteRenderer>();
             if (srDer == null) srDer = sDer.gameObject.AddComponent<SpriteRenderer>();
             srDer.sprite = sillas[Random.Range(0, sillas.Length)];
-            srDer.sortingOrder = 2;
+            srDer.sortingOrder = RenderOrder.Chair;
+            ApplyLitMaterial(srDer);
         }
 
         // 4. Hijos Hueco1 y Hueco2 alineados a X = -0.5 y X = 0.5 (desactivados para evitar rectángulos iluminados)

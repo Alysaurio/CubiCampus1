@@ -56,6 +56,7 @@ public class Student : MonoBehaviour
     SpriteRenderer conflictBox;
     GameObject chargeRoot;
     SpriteRenderer chargeBody;
+    SpriteRenderer careerBadge;
     TextMesh careerLabel;
     Collider2D col;
 
@@ -190,7 +191,7 @@ public class Student : MonoBehaviour
         body = visual.gameObject.AddComponent<SpriteRenderer>();
         body.sprite = frontSprite;
         body.sortingLayerName = "Default";
-        body.sortingOrder = 20;
+        body.sortingOrder = RenderOrder.StandingStudent;
 
         Material litMat = GetLitMaterial();
         if (litMat != null) body.sharedMaterial = litMat;
@@ -262,6 +263,16 @@ public class Student : MonoBehaviour
 
     void BuildCareerLabel(Color dark)
     {
+        // Insignia con el color de la carrera: el texto va encima, oscuro,
+        // para que se lea igual sobre cualquier fondo del aula.
+        careerBadge = PixelFactory.Quad("CarreraFondo",
+            floatingUI != null ? floatingUI : transform,
+            new Vector3(0.02f, 0.55f, 0f),
+            new Vector2(0.46f, 0.20f),
+            Color.Lerp(StudentProfile.ColorOf(profile.career), dark, 0.18f),
+            105);
+        SetupFloatingRenderer(careerBadge, 105);
+
         GameObject labelGO = new GameObject("Carrera");
         labelGO.transform.SetParent(floatingUI != null ? floatingUI : transform, false);
         labelGO.transform.localPosition = new Vector3(0.02f, 0.55f, 0f);
@@ -273,7 +284,7 @@ public class Student : MonoBehaviour
         careerLabel.fontSize = 64;
         careerLabel.characterSize = 0.04f;
         careerLabel.fontStyle = FontStyle.Bold;
-        careerLabel.color = new Color(1f, 1f, 1f, 0.25f);
+        careerLabel.color = new Color(dark.r, dark.g, dark.b, 0.95f);
 
         Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
@@ -296,7 +307,7 @@ public class Student : MonoBehaviour
         {
             body.sprite = backSprite;
             body.sortingLayerName = "Default";
-            body.sortingOrder = 1;
+            body.sortingOrder = RenderOrder.SeatedStudent;
         }
         if (visual != null)
         {
@@ -309,7 +320,7 @@ public class Student : MonoBehaviour
         }
     }
 
-    public void ApplyStandingVisuals(int sortingOrder = 20)
+    public void ApplyStandingVisuals(int sortingOrder = RenderOrder.StandingStudent)
     {
         if (body != null)
         {
@@ -405,11 +416,15 @@ public class Student : MonoBehaviour
         if (careerLabel != null)
         {
             Color c = careerLabel.color;
-            c.r = 1f;
-            c.g = 1f;
-            c.b = 1f;
-            c.a = isHovered ? 1.0f : 0.25f;
+            c.a = isHovered ? 1.0f : 0.85f;
             careerLabel.color = c;
+        }
+
+        if (careerBadge != null)
+        {
+            Color c = careerBadge.color;
+            c.a = isHovered ? 1.0f : 0.70f;
+            careerBadge.color = c;
         }
     }
 
@@ -634,7 +649,7 @@ public class Student : MonoBehaviour
         state = StudentState.Dragging;
         transform.SetParent(null);
         if (col != null) col.enabled = false;
-        ApplyStandingVisuals(60);
+        ApplyStandingVisuals(RenderOrder.DraggedStudent);
         game.SetDragOrder(this, true);
         AudioManager.Play(Sfx.Pickup, 0.8f, UnityEngine.Random.Range(0.96f, 1.05f));
     }
@@ -643,7 +658,7 @@ public class Student : MonoBehaviour
     {
         state = StudentState.InQueue;
         if (col != null) col.enabled = true;
-        ApplyStandingVisuals(20);
+        ApplyStandingVisuals(RenderOrder.StandingStudent);
         game.SetDragOrder(this, false);
         SetHover(false);
         WalkTo(queuePosition, 12f);
@@ -653,7 +668,7 @@ public class Student : MonoBehaviour
     {
         state = StudentState.Seated;
         if (col != null) col.enabled = true;
-        ApplyStandingVisuals(20);
+        ApplyStandingVisuals(RenderOrder.StandingStudent);
         game.SetDragOrder(this, false);
         SetHover(false);
         if (seat != null) WalkTo(seat.SpotPosition(Mathf.Max(0, seat.occupants.IndexOf(this))), 12f);
@@ -681,7 +696,7 @@ public class Student : MonoBehaviour
         if (conflictBox != null) conflictBox.gameObject.SetActive(careerConflict);
         if (readyBox != null) readyBox.gameObject.SetActive(false);
         if (col != null) col.enabled = true;
-        ApplyStandingVisuals(20);
+        ApplyStandingVisuals(RenderOrder.StandingStudent);
         game.SetDragOrder(this, false);
         SetHover(false);
 
@@ -758,7 +773,7 @@ public class Student : MonoBehaviour
 
     IEnumerator ExitRoutine(Color flash)
     {
-        ApplyStandingVisuals(20);
+        ApplyStandingVisuals(RenderOrder.StandingStudent);
         if (body != null) body.color = flash;
         Vector3 door = game != null ? game.DoorPosition : transform.position + Vector3.down * 3f;
 
@@ -806,7 +821,7 @@ public class Student : MonoBehaviour
         }
         else
         {
-            ApplyStandingVisuals(state == StudentState.Dragging ? 60 : 20);
+            ApplyStandingVisuals(state == StudentState.Dragging ? RenderOrder.DraggedStudent : RenderOrder.StandingStudent);
         }
     }
 }

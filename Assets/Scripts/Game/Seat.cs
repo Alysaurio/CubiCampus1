@@ -142,10 +142,17 @@ public class Seat : MonoBehaviour
     // ------------------------------------------------------------------ visual
 
     [Header("Highlight")]
-    public GameObject highlightRoot;
-    public SpriteRenderer highlightBorder;
+    [Tooltip("Sprite de la mesa que respira al arrastrar (normalmente VisualMesa).")]
+    public Transform highlightVisual;
+    [Range(0f, 0.2f)] public float highlightBreathAmount = 0.05f;
+    [Range(0.5f, 12f)] public float highlightBreathSpeed = 3.2f;
+
     bool highlightActive;
     float highlightPulse;
+    SpriteRenderer highlightSr;
+    Vector3 highlightBaseScale = Vector3.one;
+    Color highlightBaseColor = Color.white;
+    Color highlightTint = Color.white;
 
     public void BuildVisuals()
     {
@@ -155,14 +162,11 @@ public class Seat : MonoBehaviour
         Color cBorder = BaseBorder(kind);
 
         // Borde (detras) y cuerpo
-        border = PixelFactory.Quad("Borde", transform, Vector3.zero, size, cBorder, 2);
-        fill = PixelFactory.Quad("Cuerpo", transform, Vector3.zero, size * 0.88f, cFill, 3);
+        border = PixelFactory.Quad("Borde", transform, Vector3.zero, size, cBorder, RenderOrder.SeatBorder);
+        fill = PixelFactory.Quad("Cuerpo", transform, Vector3.zero, size * 0.88f, cFill, RenderOrder.SeatFill);
 
-        // Highlight para arrastre
-        highlightRoot = new GameObject("HighlightDrag");
-        highlightRoot.transform.SetParent(transform, false);
-        highlightBorder = PixelFactory.Quad("BordeHL", highlightRoot.transform, Vector3.zero, size * 1.08f, new Color(0.3f, 1f, 0.45f), 1);
-        highlightRoot.SetActive(false);
+        // El resaltado de arrastre hace "respirar" el sprite de la mesa.
+        // Si todavia no existe (se crea al decorar), se busca VisualMesa.
 
         // Enchufe (rayo) en la esquina. Se crea aqui y tambien puede activarse
         // despues desde RoomLayout con SetOutlet.
@@ -451,24 +455,51 @@ public class Seat : MonoBehaviour
 
     public void SetDragHighlight(bool valid, bool ideal)
     {
-        if (highlightBorder == null) return;
-        highlightActive = valid || ideal;
-        if (!highlightActive)
+        if (!valid && !ideal)
         {
-            if (highlightRoot != null) highlightRoot.SetActive(false);
+            ClearDragHighlight();
             return;
         }
-        if (highlightRoot != null) highlightRoot.SetActive(true);
-        if (ideal)
-            highlightBorder.color = new Color(0.3f, 1f, 0.45f);
-        else
-            highlightBorder.color = new Color(1f, 0.78f, 0.25f);
+
+        if (!highlightActive) highlightPulse = 0f;
+        highlightActive = true;
+        highlightTint = ideal
+            ? new Color(0.55f, 1f, 0.65f)
+            : new Color(1f, 0.85f, 0.45f);
+        EnsureHighlightVisual();
     }
 
     public void ClearDragHighlight()
     {
         highlightActive = false;
-        if (highlightRoot != null) highlightRoot.SetActive(false);
+        if (highlightVisual != null)
+        {
+            highlightVisual.localScale = highlightBaseScale;
+            if (highlightSr != null) highlightSr.color = highlightBaseColor;
+        }
+        highlightSr = null;
+    }
+
+    void EnsureHighlightVisual()
+    {
+        if (highlightVisual == null)
+        {
+            Transform found = transform.Find("VisualMesa");
+            if (found != null) highlightVisual = found;
+        }
+        if (highlightVisual == null)
+        {
+            if (fill != null) highlightVisual = fill.transform;
+            else if (border != null) highlightVisual = border.transform;
+        }
+        if (highlightVisual == null) return;
+
+        SpriteRenderer sr = highlightVisual.GetComponent<SpriteRenderer>();
+        if (sr == highlightSr) return;
+
+        highlightSr = sr;
+        highlightBaseScale = highlightVisual.localScale;
+        highlightBaseColor = sr != null ? sr.color : Color.white;
     }
 
     void Update()
@@ -476,13 +507,22 @@ public class Seat : MonoBehaviour
         GameManager gm = GameManager.Instance;
         if (gm == null || !gm.IsPlaying) return;
 
-        if (highlightActive && highlightBorder != null && highlightRoot != null && highlightRoot.activeSelf)
+        if (highlightActive)
         {
-            highlightPulse += Time.deltaTime * 3f;
-            float a = 0.4f + Mathf.PingPong(highlightPulse, 0.4f);
-            Color c = highlightBorder.color;
-            c.a = a;
-            highlightBorder.color = c;
+            if (highlightSr == null) EnsureHighlightVisual();
+            if (highlightVisual != null)
+            {
+                highlightPulse += Time.deltaTime * highlightBreathSpeed;
+                float t = (Mathf.Sin(highlightPulse) + 1f) * 0.5f;
+                float scale = 1f + highlightBreathAmount * t;
+                highlightVisual.localScale = new Vector3(
+                    highlightBaseScale.x * scale,
+                    highlightBaseScale.y * scale,
+                    highlightBaseScale.z);
+
+                if (highlightSr != null)
+                    highlightSr.color = Color.Lerp(highlightBaseColor, highlightTint, 0.10f + 0.20f * t);
+            }
         }
 
         if (fightActive && border != null)

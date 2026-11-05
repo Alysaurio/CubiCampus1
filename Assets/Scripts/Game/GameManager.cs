@@ -630,8 +630,11 @@ public class GameManager : MonoBehaviour
     {
         if (s == null) return;
         UnityEngine.Rendering.SortingGroup group = s.GetComponent<UnityEngine.Rendering.SortingGroup>();
-        if (group != null) group.sortingOrder = on ? 60 : 20;
-        if (s.Body != null) s.Body.sortingOrder = on ? 60 : (s.state == StudentState.Seated ? 1 : 20);
+        if (group != null) group.sortingOrder = on ? RenderOrder.DraggedStudent : RenderOrder.StandingStudent;
+        if (s.Body != null)
+            s.Body.sortingOrder = on
+                ? RenderOrder.DraggedStudent
+                : (s.state == StudentState.Seated ? RenderOrder.SeatedStudent : RenderOrder.StandingStudent);
     }
 
     // ------------------------------------------------------------------ eventos

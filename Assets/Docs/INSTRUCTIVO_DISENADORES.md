@@ -77,6 +77,43 @@ También puedes asignar:
 
 ---
 
+## 4) Capas visuales, resaltado y colores de carrera
+
+### Orden de dibujado
+Los ordenes de renderizado estan centralizados en `Assets/Scripts/Game/RenderOrder.cs` para que el gameplay quede siempre por encima de la decoracion:
+
+| Elemento | Orden |
+| --- | --- |
+| Suelo | -20 |
+| Zocalos / molduras | -18 |
+| Decoracion de pared | -16 |
+| Props / plantas | -14 |
+| Mesa (superficie) | 0 |
+| Borde y silla | 2 |
+| Cuerpo de la mesa | 3 |
+| Marcador de carrera | 7 |
+| Alumno sentado | 8 |
+| Alumno de pie | 20 |
+| Alumno mientras se arrastra | 60 |
+
+Si agregas un objeto nuevo, usa `RenderOrder` en vez de escribir el numero a mano. Asi el alumno sentado se ve sobre la mesa y la silla, y el que arrastras queda visible por encima de todo.
+
+### Resaltado al arrastrar
+Al pasar un alumno por encima de una mesa compatible, el sprite de la mesa (`VisualMesa`) hace una respiracion suave (escala 1.00x a 1.05x) y se tine de verde si la carrera coincide o de amarillo si la mesa es valida pero no ideal. Ya no se dibuja el rectangulo grande `HighlightDrag`; el efecto usa el propio sprite de la mesa. Se controla desde `Seat.SetDragHighlight(valid, ideal)` y se limpia con `Seat.ClearDragHighlight()`.
+
+### Color por carrera
+Cada carrera tiene un color fijo en `StudentProfile.ColorOf` y un codigo corto (`MEC`, `AUT`, `MKT`, `MIN`, `SST`, `SIM`). Ese color se usa en:
+- La franja y el texto de los grupos exclusivos de mesa.
+- La etiqueta flotante del alumno.
+- La insignia `CarreraFondo` que aparece encima del alumno.
+
+Para cambiar un color, edita `StudentProfile.ColorOf` y mantenlo coherente con la franja de los grupos.
+
+### Suelo y luces 2D
+El suelo generado usa `ClassroomEnvironmentGenerator.floorTint` (gris violaceo semitransparente) para dar contraste con las mesas. Los sprites generados reciben `Sprite-Lit-Default` de URP en `ClassroomEnvironmentGenerator.spriteLitMaterial`; si necesitas que una luz 2D afecte un objeto nuevo, asignale ese material.
+
+---
+
 ## Consejos
 - Usa `Resources/Audio/AudioConfig.asset` con ese nombre exacto para que se cargue automáticamente.
 - Guarda los prefabs en `Assets/Prefabs/`
