@@ -569,6 +569,8 @@ public class Seat : MonoBehaviour
 
     public Vector3 SpotPosition(int index)
     {
+        Transform h = transform.Find("Hueco" + (index + 1));
+        if (h != null) return h.position;
         return transform.position + new Vector3(SpotOffsetX(index), -0.05f, 0f);
     }
 

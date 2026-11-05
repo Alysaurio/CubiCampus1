@@ -92,7 +92,7 @@ public static class CubiGameBuilder
             for (int col = 0; col < 6; col++)
             {
                 int id = row * 6 + col + 1;
-                Vector3 pos = new Vector3(-5.53f + col * 2.86f, 3.02f - row * 1.8f, 0f);
+                Vector3 pos = new Vector3(-5.5f + col * 3.0f, 0.65f - row * 2.3f, 0f); if (Mathf.Abs(pos.x - 4.0f) < 2.0f && Mathf.Abs(pos.y - (-3.0f)) < 1.6f) pos.x += 2.5f;
                 seats.Add(MakeSeat(room.transform, id, SeatKind.Doble, pos, new Vector2(2.75f, 1.45f), false));
             }
         }
@@ -310,13 +310,13 @@ public static class CubiGameBuilder
     {
         if (GameObject.Find("MesaProfesor") == null)
         {
-            NewSprite("MesaProfesor", parent, new Vector3(3.6f, -4.13f, 0f), new Vector2(2.75f, 1.0f),
+            NewSprite("MesaProfesor", parent, new Vector3(4f, -3f, 0f), new Vector2(2.75f, 1.0f),
                 new Color(0.36f, 0.24f, 0.14f), 2);
         }
 
         if (GameObject.Find("Profesor") == null)
         {
-            NewSprite("Profesor", parent, new Vector3(3.6f, -3.62f, 0f), new Vector2(0.7f, 0.7f),
+            NewSprite("Profesor", parent, new Vector3(4f, -2.4f, 0f), new Vector2(0.7f, 0.7f),
                 new Color(0.25f, 0.55f, 0.85f), 14);
         }
     }

@@ -15,10 +15,10 @@ public static class RoomLayout
 
     const float TableWidth = 2.75f;
     const float TableHeight = 1.45f;
-    const float ColumnStep = 2.86f;
-    const float RowStep = 1.8f;
-    const float GridStartX = -5.53f;
-    const float GridStartY = 3.02f;
+    const float ColumnStep = 3.0f;
+    const float RowStep = 2.3f;
+    const float GridStartX = -5.5f;
+    const float GridStartY = 0.65f;
 
     public static void Apply(GameManager game)
     {
@@ -40,17 +40,24 @@ public static class RoomLayout
 
     static void ResizeRoom()
     {
-        Move("Piso", new Vector3(0.5f, -0.2f, 0f), new Vector2(19.8f, 9.3f));
-        Move("ParedArriba", new Vector3(0.5f, 4.45f, 0f), new Vector2(20.2f, 0.25f));
-        Move("ParedAbajo", new Vector3(0.5f, -4.85f, 0f), new Vector2(20.2f, 0.25f));
-        Move("ParedIzquierda", new Vector3(-9.35f, -0.2f, 0f), new Vector2(0.25f, 9.6f));
-        Move("ParedDerecha", new Vector3(10.35f, -0.2f, 0f), new Vector2(0.25f, 9.6f));
+        GameObject piso = GameObject.Find("Piso");
+        if (piso != null)
+        {
+            piso.transform.position = Vector3.zero;
+            piso.transform.localScale = Vector3.one;
+            var sr = piso.GetComponent<SpriteRenderer>();
+            if (sr != null) sr.enabled = false;
+        }
+
+        Hide("ParedArriba");
+        Hide("ParedAbajo");
+        Hide("ParedIzquierda");
+        Hide("ParedDerecha");
 
         // La fila queda como una franja vertical a la izquierda.
         Move("ZonaFila", new Vector3(-7.95f, -0.35f, 0f), new Vector2(2.25f, 8.1f));
 
-        // Las zonas antiguas (silencio/dobles/ruido) ya no existen como mechanic:
-        // se ocultan para que la sala se lea solo por carreras.
+        // Las zonas antiguas se ocultan
         Hide("ZonaSilencio");
         Hide("ZonaDoble");
         Hide("ZonaRuido");
@@ -58,14 +65,11 @@ public static class RoomLayout
         Hide("MarcaDoble");
         Hide("MarcaRuido");
 
-        // Estanterias al fondo superior, para que no tapen las mesas ni la mesa
-        // del profesor.
-        Move("Estanteria0", new Vector3(1.2f, 4.08f, 0f), new Vector2(2.4f, 0.42f));
-        Move("Estanteria1", new Vector3(4.2f, 4.08f, 0f), new Vector2(2.4f, 0.42f));
-        Move("Estanteria2", new Vector3(7.2f, 4.08f, 0f), new Vector2(2.4f, 0.42f));
-
-        Move("Puerta", new Vector3(-7.95f, -4.52f, 0f), new Vector2(1.9f, 0.40f));
-        Move("PuertaLuz", new Vector3(-7.95f, -4.28f, 0f), new Vector2(1.4f, 0.12f));
+        Hide("Estanteria0");
+        Hide("Estanteria1");
+        Hide("Estanteria2");
+        Hide("Puerta");
+        Hide("PuertaLuz");
     }
 
     static void Move(string name, Vector3 pos, Vector2 size)
@@ -162,10 +166,15 @@ public static class RoomLayout
             int row = i / TablesPerRow;
             int col = i % TablesPerRow;
 
-            s.transform.position = new Vector3(
+            Vector3 pos = new Vector3(
                 GridStartX + col * ColumnStep,
                 GridStartY - row * RowStep,
                 0f);
+            if (Mathf.Abs(pos.x - 4.0f) < 2.0f && Mathf.Abs(pos.y - (-3.0f)) < 1.6f)
+            {
+                pos.x += 2.5f;
+            }
+            s.transform.position = pos;
         }
     }
 
@@ -540,7 +549,7 @@ public static class RoomLayout
             sr.sprite = PixelFactory.White;
             sr.color = new Color(0.36f, 0.24f, 0.14f);
             sr.sortingOrder = 2;
-            desk.transform.position = new Vector3(3.6f, -4.13f, 0f);
+            desk.transform.position = new Vector3(4f, -3f, 0f);
             desk.transform.localScale = new Vector3(2.75f, 1.0f, 1f);
         }
 
@@ -552,7 +561,7 @@ public static class RoomLayout
             sr.sprite = PixelFactory.White;
             sr.color = new Color(0.25f, 0.55f, 0.85f);
             sr.sortingOrder = 14;
-            teacher.transform.position = new Vector3(3.6f, -3.62f, 0f);
+            teacher.transform.position = new Vector3(4f, -2.4f, 0f);
             teacher.transform.localScale = new Vector3(0.7f, 0.7f, 1f);
         }
     }
