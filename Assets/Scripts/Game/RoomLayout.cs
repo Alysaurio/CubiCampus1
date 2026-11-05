@@ -55,7 +55,7 @@ public static class RoomLayout
         Hide("ParedDerecha");
 
         // La fila queda como una franja vertical a la izquierda.
-        Move("ZonaFila", new Vector3(-7.95f, -0.35f, 0f), new Vector2(2.25f, 8.1f));
+        Move("ZonaFila", new Vector3(-8.0f, -1.0f, 0f), new Vector2(2.25f, 6.9f));
 
         // Las zonas antiguas se ocultan
         Hide("ZonaSilencio");

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -52,6 +53,18 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
     public int floorRows = 7;
     public float floorStartY = 2.0f;
 
+    [Header("Iluminación 2D URP")]
+    public Color globalLightColor = new Color(1.0f, 0.957f, 0.902f, 1.0f); // #FFF4E6
+    [Range(0.1f, 2.0f)] public float globalLightIntensity = 0.68f;
+    public Color windowLightColor = new Color(1.0f, 0.875f, 0.557f, 1.0f); // #FFDF8E
+    [Range(0.5f, 3.0f)] public float windowLightIntensity = 1.15f;
+    [Range(60f, 180f)] public float windowLightOuterAngle = 120f;
+    [Range(10f, 90f)] public float windowLightInnerAngle = 50f;
+    [Range(5f, 30f)] public float windowLightOuterRadius = 19f;
+    [Range(0f, 1f)] public float windowLightFalloff = 0.65f;
+    [Range(0f, 1f)] public float windowShadowIntensity = 0.45f;
+    public float windowLightRotationZ = -140f;
+
     void Awake()
     {
         if (Application.isPlaying)
@@ -92,6 +105,8 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         int active = Application.isPlaying ? GetCurrentActiveSeats() : 8;
         AutoDistributeTables(active);
         DecorateTables();
+        SetupLighting2D();
+        SetupShadowCasters();
     }
 
 #if UNITY_EDITOR
@@ -172,14 +187,16 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         }
 
         Transform gridRoot = pisoT.Find("CuadriculaPisoPared");
-        if (gridRoot != null)
+        if (gridRoot == null)
         {
-            DestroyObjectSafe(gridRoot.gameObject);
+            GameObject gridGO = new GameObject("CuadriculaPisoPared");
+            gridGO.transform.SetParent(pisoT, false);
+            gridRoot = gridGO.transform;
         }
-
-        GameObject gridGO = new GameObject("CuadriculaPisoPared");
-        gridGO.transform.SetParent(pisoT, false);
-        gridRoot = gridGO.transform;
+        else
+        {
+            ClearChildren(gridRoot);
+        }
 
         // 1. Dos filas superiores: Classroom_wall (32x64 px -> 1x2 unidades)
         for (int col = minCol; col <= maxCol; col++)
@@ -216,14 +233,16 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
     public void SetupTrimPerimeter()
     {
         Transform trimRoot = transform.Find("BordesTrim");
-        if (trimRoot != null)
+        if (trimRoot == null)
         {
-            DestroyObjectSafe(trimRoot.gameObject);
+            GameObject trimGO = new GameObject("BordesTrim");
+            trimGO.transform.SetParent(transform, false);
+            trimRoot = trimGO.transform;
         }
-
-        GameObject trimGO = new GameObject("BordesTrim");
-        trimGO.transform.SetParent(transform, false);
-        trimRoot = trimGO.transform;
+        else
+        {
+            ClearChildren(trimRoot);
+        }
 
         int order = -18;
 
@@ -281,10 +300,19 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
             }
         }
 
-        // Configurar ZonaFila con transparencia Alpha = 0.25
+        // Configurar ZonaFila: posicion x = -8, y = -1, escala y = 6.9, transparencia Alpha = 0.25
         GameObject zf = GameObject.Find("ZonaFila");
         if (zf != null)
         {
+            Vector3 lp = zf.transform.localPosition;
+            lp.x = -8.0f;
+            lp.y = -1.0f;
+            zf.transform.localPosition = lp;
+
+            Vector3 ls = zf.transform.localScale;
+            ls.y = 6.9f;
+            zf.transform.localScale = ls;
+
             SpriteRenderer srZf = zf.GetComponent<SpriteRenderer>();
             if (srZf != null)
             {
@@ -295,14 +323,16 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         }
 
         Transform decorRoot = transform.Find("DecoracionSuperior");
-        if (decorRoot != null)
+        if (decorRoot == null)
         {
-            DestroyObjectSafe(decorRoot.gameObject);
+            GameObject rootGO = new GameObject("DecoracionSuperior");
+            rootGO.transform.SetParent(transform, false);
+            decorRoot = rootGO.transform;
         }
-
-        GameObject rootGO = new GameObject("DecoracionSuperior");
-        rootGO.transform.SetParent(transform, false);
-        decorRoot = rootGO.transform;
+        else
+        {
+            ClearChildren(decorRoot);
+        }
 
         // 1. PUERTA EN POSICIÓN EXACTA X = -8 (sobre la base de la pared en Y = 3.5)
         CreateProp("Door", decorRoot, new Vector3(-8.0f, 3.5f, 0f), classroomDoor, -14);
@@ -334,18 +364,12 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         // Los unicos objetos aqui son SchoolBoard, WallClock, MesaProfesor y Profesor.
         // Nota: Se elimino por completo el uso de "school_books".
 
-        // 4. PARED DERECHA (X >= 4.8 hasta 11.5)
+        // 4. PARED DERECHA (X >= 4.8 hasta 11.5) con segunda ventana
         CreateProp("ClassroomPlant", decorRoot, new Vector3(5.0f, 3.25f, 0f), classroomPlant, -14);
-
-        // Variar aleatoriamente orden de mapa y corcho
-        bool mapFirst = Random.value < 0.5f;
-        CreateProp(mapFirst ? "ClassroomMap" : "PinBoard", decorRoot, new Vector3(6.8f, 3.5f, 0f),
-            mapFirst ? classroomMap : pinBoard, -16);
-
-        CreateProp(mapFirst ? "PinBoard" : "ClassroomMap", decorRoot, new Vector3(8.7f, 3.5f, 0f),
-            mapFirst ? pinBoard : classroomMap, -16);
-
-        CreateProp("BookCupboard", decorRoot, new Vector3(10.6f, 3.5f, 0f), bookCupboard, -14);
+        CreateProp("ClassroomMap", decorRoot, new Vector3(6.5f, 3.5f, 0f), classroomMap, -16);
+        CreateProp("SchoolWindow2", decorRoot, new Vector3(8.0f, 3.5f, 0f), schoolWindow, -16);
+        CreateProp("PinBoard", decorRoot, new Vector3(9.5f, 3.5f, 0f), pinBoard, -16);
+        CreateProp("BookCupboard", decorRoot, new Vector3(11.0f, 3.5f, 0f), bookCupboard, -14);
     }
 
     void CreateProp(string name, Transform parent, Vector3 localPos, Sprite sprite, int order)
@@ -553,6 +577,7 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         {
             var sr = cuerpo.GetComponent<SpriteRenderer>();
             if (sr != null) sr.enabled = false;
+            cuerpo.gameObject.SetActive(false);
         }
 
         Transform borde = mesaT.Find("Borde");
@@ -560,6 +585,7 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         {
             var sr = borde.GetComponent<SpriteRenderer>();
             if (sr != null) sr.enabled = false;
+            borde.gameObject.SetActive(false);
         }
 
         // 3. Sillas dobles ajustadas a X = -0.5 y X = 0.5
@@ -596,12 +622,13 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
             srDer.sortingOrder = 3;
         }
 
-        // 4. Hijos Hueco1 y Hueco2 alineados a X = -0.5 y X = 0.5
+        // 4. Hijos Hueco1 y Hueco2 alineados a X = -0.5 y X = 0.5 (desactivados para evitar rectángulos iluminados)
         Transform h1 = mesaT.Find("Hueco1");
         if (h1 != null)
         {
             var sr = h1.GetComponent<SpriteRenderer>();
             if (sr != null) sr.enabled = false;
+            h1.gameObject.SetActive(false);
             h1.localPosition = new Vector3(-0.5f, -0.55f, 0f);
         }
 
@@ -610,8 +637,18 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         {
             var sr = h2.GetComponent<SpriteRenderer>();
             if (sr != null) sr.enabled = false;
+            h2.gameObject.SetActive(false);
             h2.localPosition = new Vector3(0.5f, -0.55f, 0f);
         }
+
+        Vector3[] deskPath = new Vector3[]
+        {
+            new Vector3(-0.95f, -0.55f, 0f),
+            new Vector3(-0.95f,  0.65f, 0f),
+            new Vector3( 0.95f,  0.65f, 0f),
+            new Vector3( 0.95f, -0.55f, 0f)
+        };
+        ApplyShadowCaster(mesaT.gameObject, deskPath);
 
         // 5. Interfaz de GrupoCarrera (GrupoFranja escala (1.8, 0.3), Alpha 0.75; GrupoTexto Negrita)
         Transform grupoCarrera = mesaT.Find("GrupoCarrera");
@@ -642,15 +679,292 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         }
     }
 
+    // ------------------------------------------------------------------ TAREA 6: ILUMINACIÓN 2D (URP)
+    public void SetupLighting2D()
+    {
+        Transform lightsParent = transform.Find("Iluminacion2D");
+        if (lightsParent == null)
+        {
+            GameObject go = new GameObject("Iluminacion2D");
+            go.transform.SetParent(transform, false);
+            lightsParent = go.transform;
+        }
+
+        // 1. Global Light 2D
+        Transform globalLightT = lightsParent.Find("Global Light 2D");
+        if (globalLightT == null)
+        {
+            GameObject go = new GameObject("Global Light 2D");
+            go.transform.SetParent(lightsParent, false);
+            globalLightT = go.transform;
+        }
+
+        Light2D globalLight = globalLightT.GetComponent<Light2D>();
+        if (globalLight == null) globalLight = globalLightT.gameObject.AddComponent<Light2D>();
+        globalLight.lightType = Light2D.LightType.Global;
+        globalLight.color = globalLightColor;
+        globalLight.intensity = globalLightIntensity;
+
+        // Sorting layers
+        int[] allLayers = new int[SortingLayer.layers.Length];
+        for (int i = 0; i < SortingLayer.layers.Length; i++)
+        {
+            allLayers[i] = SortingLayer.layers[i].id;
+        }
+        globalLight.targetSortingLayers = allLayers;
+
+        Transform decorRoot = transform.Find("DecoracionSuperior");
+        if (decorRoot != null)
+        {
+            // 2. Luz Solar de Ventana 1 (SchoolWindow -> LuzVentana)
+            Transform windowT = decorRoot.Find("SchoolWindow");
+            if (windowT != null)
+            {
+                Transform windowLightT = windowT.Find("LuzVentana");
+                if (windowLightT == null)
+                {
+                    GameObject go = new GameObject("LuzVentana");
+                    go.transform.SetParent(windowT, false);
+                    windowLightT = go.transform;
+                }
+
+                windowLightT.localPosition = Vector3.zero;
+                windowLightT.localRotation = Quaternion.Euler(0f, 0f, 179.347f);
+
+                Light2D windowLight = windowLightT.GetComponent<Light2D>();
+                if (windowLight == null) windowLight = windowLightT.gameObject.AddComponent<Light2D>();
+
+                windowLight.lightType = Light2D.LightType.Point;
+                windowLight.color = windowLightColor;
+                windowLight.intensity = 1.15f;
+                windowLight.pointLightInnerRadius = 5.712087f;
+                windowLight.pointLightOuterRadius = 13.85255f;
+                windowLight.pointLightInnerAngle = 118.05f;
+                windowLight.pointLightOuterAngle = 195.26f;
+                windowLight.falloffIntensity = 0.65f;
+                windowLight.volumetricEnabled = true;
+                windowLight.volumeIntensity = 0.06f;
+                windowLight.shadowsEnabled = true;
+                windowLight.shadowIntensity = 0.45f;
+                windowLight.targetSortingLayers = allLayers;
+
+#if UNITY_EDITOR
+                SerializedObject so1 = new SerializedObject(windowLight);
+                var vProp1 = so1.FindProperty("m_LightVolumeEnabled");
+                if (vProp1 != null) vProp1.boolValue = true;
+                var viProp1 = so1.FindProperty("m_LightVolumeIntensity");
+                if (viProp1 != null) viProp1.floatValue = 0.06f;
+                so1.ApplyModifiedProperties();
+#endif
+            }
+
+            // 3. Luz Solar de Ventana 2 (SchoolWindow2 -> LuzVentana2)
+            Transform window2T = decorRoot.Find("SchoolWindow2");
+            if (window2T != null)
+            {
+                Transform windowLight2T = window2T.Find("LuzVentana2");
+                if (windowLight2T == null)
+                {
+                    GameObject go = new GameObject("LuzVentana2");
+                    go.transform.SetParent(window2T, false);
+                    windowLight2T = go.transform;
+                }
+
+                windowLight2T.localPosition = new Vector3(5f, -2.5f, 0f);
+                windowLight2T.localRotation = Quaternion.Euler(0f, 0f, 125.527f);
+
+                Light2D windowLight2 = windowLight2T.GetComponent<Light2D>();
+                if (windowLight2 == null) windowLight2 = windowLight2T.gameObject.AddComponent<Light2D>();
+
+                windowLight2.lightType = Light2D.LightType.Point;
+                windowLight2.color = windowLightColor;
+                windowLight2.intensity = 1.15f;
+                windowLight2.pointLightInnerRadius = 8.459514f;
+                windowLight2.pointLightOuterRadius = 18.44963f;
+                windowLight2.pointLightInnerAngle = 67.84f;
+                windowLight2.pointLightOuterAngle = 171.39f;
+                windowLight2.falloffIntensity = 0.65f;
+                windowLight2.volumetricEnabled = true;
+                windowLight2.volumeIntensity = 0.06f;
+                windowLight2.shadowsEnabled = true;
+                windowLight2.shadowIntensity = 0.45f;
+                windowLight2.targetSortingLayers = allLayers;
+
+#if UNITY_EDITOR
+                SerializedObject so2 = new SerializedObject(windowLight2);
+                var vProp2 = so2.FindProperty("m_LightVolumeEnabled");
+                if (vProp2 != null) vProp2.boolValue = true;
+                var viProp2 = so2.FindProperty("m_LightVolumeIntensity");
+                if (viProp2 != null) viProp2.floatValue = 0.06f;
+                so2.ApplyModifiedProperties();
+#endif
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ TAREA 7: SOMBRAS (SHADOW CASTER 2D)
+    public void SetupShadowCasters()
+    {
+        // Polígono para mesas: envuelve el contorno del cuerpo de la mesa excluyendo las sillas
+        Vector3[] deskPath = new Vector3[]
+        {
+            new Vector3(-0.95f, -0.55f, 0f),
+            new Vector3(-0.95f,  0.65f, 0f),
+            new Vector3( 0.95f,  0.65f, 0f),
+            new Vector3( 0.95f, -0.55f, 0f)
+        };
+
+        // Mesas 1 a 24
+        for (int i = 1; i <= 24; i++)
+        {
+            Transform mesaT = transform.Find($"Mesa_{i}_Doble");
+            if (mesaT != null)
+            {
+                ApplyShadowCaster(mesaT.gameObject, deskPath);
+            }
+        }
+
+        // Mesa Profesor
+        Transform mesaProfesor = transform.Find("MesaProfesor");
+        if (mesaProfesor != null)
+        {
+            ApplyShadowCaster(mesaProfesor.gameObject, deskPath);
+        }
+
+        // Objetos altos en la pared y base
+        Transform decorRoot = transform.Find("DecoracionSuperior");
+        if (decorRoot != null)
+        {
+            Transform bookCupboardT = decorRoot.Find("BookCupboard");
+            if (bookCupboardT != null)
+            {
+                Vector3[] path = new Vector3[]
+                {
+                    new Vector3(-0.95f, -0.95f, 0f),
+                    new Vector3(-0.95f,  0.95f, 0f),
+                    new Vector3( 0.95f,  0.95f, 0f),
+                    new Vector3( 0.95f, -0.95f, 0f)
+                };
+                ApplyShadowCaster(bookCupboardT.gameObject, path);
+            }
+
+            Transform bookshelfT = decorRoot.Find("ClassroomBookshelf");
+            if (bookshelfT != null)
+            {
+                Vector3[] path = new Vector3[]
+                {
+                    new Vector3(-0.70f, -0.70f, 0f),
+                    new Vector3(-0.70f,  0.70f, 0f),
+                    new Vector3( 0.70f,  0.70f, 0f),
+                    new Vector3( 0.70f, -0.70f, 0f)
+                };
+                ApplyShadowCaster(bookshelfT.gameObject, path);
+            }
+
+            Transform bigPlantT = decorRoot.Find("BigPlant");
+            if (bigPlantT != null)
+            {
+                Vector3[] path = new Vector3[]
+                {
+                    new Vector3(-0.45f, -0.95f, 0f),
+                    new Vector3(-0.45f,  0.95f, 0f),
+                    new Vector3( 0.45f,  0.95f, 0f),
+                    new Vector3( 0.45f, -0.95f, 0f)
+                };
+                ApplyShadowCaster(bigPlantT.gameObject, path);
+            }
+
+            Transform binT = decorRoot.Find("Bin");
+            if (binT != null)
+            {
+                Vector3[] path = new Vector3[]
+                {
+                    new Vector3(-0.40f, -0.45f, 0f),
+                    new Vector3(-0.40f,  0.45f, 0f),
+                    new Vector3( 0.40f,  0.45f, 0f),
+                    new Vector3( 0.40f, -0.45f, 0f)
+                };
+                ApplyShadowCaster(binT.gameObject, path);
+            }
+        }
+
+        // Profesor
+        Transform profT = transform.Find("Profesor");
+        if (profT != null)
+        {
+            Vector3[] path = new Vector3[]
+            {
+                new Vector3(-0.40f, -0.45f, 0f),
+                new Vector3(-0.40f,  0.45f, 0f),
+                new Vector3( 0.40f,  0.45f, 0f),
+                new Vector3( 0.40f, -0.45f, 0f)
+            };
+            ApplyShadowCaster(profT.gameObject, path);
+        }
+    }
+
+    public static void ApplyShadowCaster(GameObject go, Vector3[] path)
+    {
+        if (go == null) return;
+        ShadowCaster2D sc = go.GetComponent<ShadowCaster2D>();
+        if (sc == null) sc = go.AddComponent<ShadowCaster2D>();
+        sc.selfShadows = false;
+        sc.castsShadows = true;
+
+#if UNITY_EDITOR
+        SerializedObject so = new SerializedObject(sc);
+        SerializedProperty pathProp = so.FindProperty("m_ShapePath");
+        if (pathProp != null)
+        {
+            pathProp.arraySize = path.Length;
+            for (int i = 0; i < path.Length; i++)
+            {
+                pathProp.GetArrayElementAtIndex(i).vector3Value = path[i];
+            }
+        }
+        SerializedProperty sourceProp = so.FindProperty("m_ShadowCastingSource");
+        if (sourceProp != null) sourceProp.intValue = 1; // Shape Editor
+        SerializedProperty silProp = so.FindProperty("m_UseRendererSilhouette");
+        if (silProp != null) silProp.boolValue = false;
+        so.ApplyModifiedProperties();
+#endif
+
+        var pathField = typeof(ShadowCaster2D).GetField("m_ShapePath", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        pathField?.SetValue(sc, path);
+
+        var sourceField = typeof(ShadowCaster2D).GetField("m_ShadowCastingSource", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (sourceField != null)
+        {
+            var enumVal = System.Enum.ToObject(sourceField.FieldType, 1);
+            sourceField.SetValue(sc, enumVal);
+        }
+
+        var silField = typeof(ShadowCaster2D).GetField("m_UseRendererSilhouette", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        silField?.SetValue(sc, false);
+    }
+
+    void ClearChildren(Transform parent)
+    {
+        if (parent == null) return;
+        for (int i = parent.childCount - 1; i >= 0; i--)
+        {
+            GameObject child = parent.GetChild(i).gameObject;
+            DestroyObjectSafe(child);
+        }
+    }
+
     void DestroyObjectSafe(GameObject go)
     {
+        if (go == null) return;
 #if UNITY_EDITOR
         if (!Application.isPlaying)
+        {
             DestroyImmediate(go);
-        else
-            Destroy(go);
-#else
-        Destroy(go);
+            return;
+        }
 #endif
+        go.name = "_Destroying_" + go.name;
+        go.SetActive(false);
+        Destroy(go);
     }
 }
