@@ -205,25 +205,25 @@ public class TutorialDia1 : MonoBehaviour
         CrearRect(pico.transform, new Vector2(-15, 0), new Vector2(4, 30), new Color(0.15f, 0.18f, 0.25f));
         CrearRect(pico.transform, new Vector2(0, 15), new Vector2(30, 4), new Color(0.15f, 0.18f, 0.25f));
         
-        // Avatar NPC (cuadrado redondeado geométrico)
-        npcAvatar = new GameObject("NPC_Avatar");
+        // Avatar NPC (Sprite npcprofeicono 44x47, Scale 2x2)
+        npcAvatar = new GameObject("npcprofeicono");
         npcAvatar.transform.SetParent(panelTutorial.transform, false);
         rtAvatar = npcAvatar.AddComponent<RectTransform>();
         rtAvatar.anchorMin = new Vector2(0f, 0f);
         rtAvatar.anchorMax = new Vector2(0f, 0f);
         rtAvatar.pivot = new Vector2(0.5f, 0f);
-        rtAvatar.sizeDelta = new Vector2(110, 130);
+        rtAvatar.sizeDelta = new Vector2(88, 94); // Multiplo 2x proporcional a 44x47
+        rtAvatar.localScale = new Vector3(2f, 2f, 1f);
         rtAvatar.anchoredPosition = posicionNPC;
         Image imgAvatar = npcAvatar.AddComponent<Image>();
-        imgAvatar.color = new Color(0.25f, 0.45f, 0.9f, 1f);
-        // Detalles geométricos
-        CrearRect(npcAvatar.transform, new Vector2(0, 20), new Vector2(70, 70), new Color(0.95f, 0.85f, 0.75f)); // cara
-        CrearRect(npcAvatar.transform, new Vector2(-12, 28), new Vector2(10, 10), Color.black); // ojo izq
-        CrearRect(npcAvatar.transform, new Vector2(12, 28), new Vector2(10, 10), Color.black); // ojo der
-        CrearRect(npcAvatar.transform, new Vector2(0, 10), new Vector2(18, 4), Color.black); // boca
-        CrearRect(npcAvatar.transform, new Vector2(0, -35), new Vector2(60, 40), new Color(0.2f, 0.35f, 0.75f)); // cuerpo
-        CrearRect(npcAvatar.transform, new Vector2(0, -30), new Vector2(40, 8), new Color(1f, 0.84f, 0.35f)); // corbata
-        
+        Sprite iconoProfe = Resources.Load<Sprite>("NPCs/npcprofeicono");
+#if UNITY_EDITOR
+        if (iconoProfe == null) iconoProfe = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/NPCs/npcprofeicono.png");
+#endif
+        imgAvatar.sprite = iconoProfe;
+        imgAvatar.color = Color.white;
+        imgAvatar.preserveAspect = true;
+
         // Nombre NPC
         GameObject goNombre = new GameObject("TxtNombre");
         goNombre.transform.SetParent(panelDialogo.transform, false);

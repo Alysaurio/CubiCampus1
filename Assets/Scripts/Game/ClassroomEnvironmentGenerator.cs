@@ -406,9 +406,22 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         {
             // Profesor a un costado (derecho) de MesaProfesor
             teacherT.localPosition = new Vector3(deskX + 1.35f, deskY, 0f);
-            teacherT.localScale = new Vector3(0.7f, 0.7f, 1f);
+            teacherT.localScale = new Vector3(1.8f, 2.0f, 1.0f);
             SpriteRenderer sr = teacherT.GetComponent<SpriteRenderer>();
-            if (sr != null) sr.sortingOrder = 4;
+            if (sr != null)
+            {
+                Sprite profeSprite = Resources.Load<Sprite>("NPCs/npcprofe");
+#if UNITY_EDITOR
+                if (profeSprite == null) profeSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/NPCs/npcprofe.png");
+#endif
+                if (profeSprite != null) sr.sprite = profeSprite;
+                sr.color = Color.white;
+                sr.sortingOrder = 4;
+            }
+            if (teacherT.GetComponent<TeacherIdleAnimation>() == null)
+            {
+                teacherT.gameObject.AddComponent<TeacherIdleAnimation>();
+            }
         }
     }
 
@@ -569,7 +582,7 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         if (srMesa == null) srMesa = visualT.gameObject.AddComponent<SpriteRenderer>();
         srMesa.sprite = mesaSprite;
         srMesa.color = Color.white;
-        srMesa.sortingOrder = 2;
+        srMesa.sortingOrder = 0;
 
         // 2. Desactivar renderers rectangulares antiguos de Borde y Cuerpo
         Transform cuerpo = mesaT.Find("Cuerpo");
@@ -604,7 +617,7 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
             var srIzq = sIzq.GetComponent<SpriteRenderer>();
             if (srIzq == null) srIzq = sIzq.gameObject.AddComponent<SpriteRenderer>();
             srIzq.sprite = sillas[Random.Range(0, sillas.Length)];
-            srIzq.sortingOrder = 3;
+            srIzq.sortingOrder = 2;
 
             // Silla Derecha
             Transform sDer = mesaT.Find("Silla_Der");
@@ -619,7 +632,7 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
             var srDer = sDer.GetComponent<SpriteRenderer>();
             if (srDer == null) srDer = sDer.gameObject.AddComponent<SpriteRenderer>();
             srDer.sprite = sillas[Random.Range(0, sillas.Length)];
-            srDer.sortingOrder = 3;
+            srDer.sortingOrder = 2;
         }
 
         // 4. Hijos Hueco1 y Hueco2 alineados a X = -0.5 y X = 0.5 (desactivados para evitar rectángulos iluminados)
@@ -654,6 +667,7 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         Transform grupoCarrera = mesaT.Find("GrupoCarrera");
         if (grupoCarrera != null)
         {
+            grupoCarrera.localPosition = new Vector3(grupoCarrera.localPosition.x, 0.1f, grupoCarrera.localPosition.z);
             Transform franja = grupoCarrera.Find("GrupoFranja");
             if (franja != null)
             {
@@ -674,6 +688,7 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
                 if (tm != null)
                 {
                     tm.fontStyle = FontStyle.Bold;
+                    tm.color = Color.black;
                 }
             }
         }
@@ -705,13 +720,19 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
         globalLight.color = globalLightColor;
         globalLight.intensity = globalLightIntensity;
 
-        // Sorting layers
-        int[] allLayers = new int[SortingLayer.layers.Length];
-        for (int i = 0; i < SortingLayer.layers.Length; i++)
+        // Sorting layers: Excluir estrictamente la capa UI para no iluminar Canvas ni menus
+        System.Collections.Generic.List<int> validLayers = new System.Collections.Generic.List<int>();
+        foreach (var sl in SortingLayer.layers)
         {
-            allLayers[i] = SortingLayer.layers[i].id;
+            if (sl.name != "UI")
+            {
+                validLayers.Add(sl.id);
+            }
         }
-        globalLight.targetSortingLayers = allLayers;
+        int[] lightLayers = validLayers.ToArray();
+        globalLight.targetSortingLayers = lightLayers;
+        Canvas mainCanvas = Object.FindFirstObjectByType<Canvas>();
+        if (mainCanvas != null) mainCanvas.sortingLayerName = "UI";
 
         Transform decorRoot = transform.Find("DecoracionSuperior");
         if (decorRoot != null)
@@ -728,7 +749,7 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
                     windowLightT = go.transform;
                 }
 
-                windowLightT.localPosition = Vector3.zero;
+                windowLightT.localPosition = new Vector3(0f, 0.6f, 0f);
                 windowLightT.localRotation = Quaternion.Euler(0f, 0f, 179.347f);
 
                 Light2D windowLight = windowLightT.GetComponent<Light2D>();
@@ -746,7 +767,7 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
                 windowLight.volumeIntensity = 0.06f;
                 windowLight.shadowsEnabled = true;
                 windowLight.shadowIntensity = 0.45f;
-                windowLight.targetSortingLayers = allLayers;
+                windowLight.targetSortingLayers = lightLayers;
 
 #if UNITY_EDITOR
                 SerializedObject so1 = new SerializedObject(windowLight);
@@ -788,7 +809,7 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
                 windowLight2.volumeIntensity = 0.06f;
                 windowLight2.shadowsEnabled = true;
                 windowLight2.shadowIntensity = 0.45f;
-                windowLight2.targetSortingLayers = allLayers;
+                windowLight2.targetSortingLayers = lightLayers;
 
 #if UNITY_EDITOR
                 SerializedObject so2 = new SerializedObject(windowLight2);

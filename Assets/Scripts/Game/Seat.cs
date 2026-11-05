@@ -250,7 +250,7 @@ public class Seat : MonoBehaviour
         if (groupLabel != null)
         {
             groupLabel.text = StudentProfile.ShortCode(career);
-            groupLabel.color = new Color(0.06f, 0.07f, 0.10f, 0.95f);
+            groupLabel.color = Color.black;
         groupLabel.fontStyle = FontStyle.Bold;
         }
         RefreshVisual();
@@ -277,7 +277,7 @@ public class Seat : MonoBehaviour
         groupLabel.alignment = TextAlignment.Center;
         groupLabel.fontSize = 64;
         groupLabel.characterSize = 0.055f;
-        groupLabel.color = new Color(0.06f, 0.07f, 0.10f, 0.95f);
+        groupLabel.color = Color.black;
         groupLabel.fontStyle = FontStyle.Bold;
 
         Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");

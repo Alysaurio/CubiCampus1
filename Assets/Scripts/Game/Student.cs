@@ -1,3 +1,4 @@
+using UnityEngine.InputSystem;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -16,8 +17,8 @@ public enum StudentState
 
 /// <summary>
 /// Estudiante de la sala. Cada alumno pertenece a una carrera de Tecsup.
-/// Paciencia en fila, tiempo de estudio, distraccion y salida. Visual 100%
-/// geometrico (cuadrados + etiqueta de carrera + barra de estado).
+/// Paciencia en fila, tiempo de estudio, distraccion y salida. Visual pixel art
+/// con transicion frontal/trasera, animacion procedural y datos flotantes en capa UI.
 /// </summary>
 public class Student : MonoBehaviour
 {
@@ -38,13 +39,16 @@ public class Student : MonoBehaviour
     public bool chargePenalized;     // ya se le desconto eficiencia por no tener cargador
     public bool readyPenalized;      // ya se le desconto eficiencia por esperar listo
     public Seat seat;
+    public int npcIndex = -1;
+
+    public SpriteRenderer Body => body;
 
     GameManager game;
     QueueManager queue;
 
     Transform visual;
+    Transform floatingUI;
     SpriteRenderer body;
-    SpriteRenderer head;
     SpriteRenderer barBg;
     SpriteRenderer barFill;
     SpriteRenderer alertBox;
@@ -62,6 +66,14 @@ public class Student : MonoBehaviour
     float packLeft;
     float packMax = 1.4f;
 
+    Sprite frontSprite;
+    Sprite backSprite;
+
+    static Sprite[] frontSprites;
+    static Sprite[] backSprites;
+    static Material litMaterial;
+    static Material unlitMaterial;
+
     public float PatienceFraction
     {
         get { return patienceMax > 0f ? Mathf.Clamp01(patience / patienceMax) : 0f; }
@@ -74,10 +86,50 @@ public class Student : MonoBehaviour
         get { return packMax > 0f ? Mathf.Clamp01(1f - packLeft / packMax) : 1f; }
     }
 
+    public static void LoadNPCSprites()
+    {
+        if (frontSprites != null && frontSprites.Length == 6 && frontSprites[0] != null) return;
+        frontSprites = new Sprite[6];
+        backSprites = new Sprite[6];
+        for (int i = 0; i < 6; i++)
+        {
+            frontSprites[i] = Resources.Load<Sprite>($"NPCs/npc{i + 1}f");
+            backSprites[i] = Resources.Load<Sprite>($"NPCs/npc{i + 1}b");
+#if UNITY_EDITOR
+            if (frontSprites[i] == null)
+                frontSprites[i] = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Sprites/NPCs/npc{i + 1}f.png");
+            if (backSprites[i] == null)
+                backSprites[i] = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Sprites/NPCs/npc{i + 1}b.png");
+#endif
+        }
+    }
+
+    public static Material GetLitMaterial()
+    {
+        if (litMaterial == null)
+        {
+            Shader s = Shader.Find("Universal Render Pipeline/2D/Sprite-Lit-Default");
+            if (s != null) litMaterial = new Material(s);
+        }
+        return litMaterial;
+    }
+
+    public static Material GetUnlitMaterial()
+    {
+        if (unlitMaterial == null)
+        {
+            Shader s = Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit-Default");
+            if (s == null) s = Shader.Find("Sprites/Default");
+            if (s != null) unlitMaterial = new Material(s);
+        }
+        return unlitMaterial;
+    }
+
     public static Student Create(StudentProfile profile, Vector3 position, GameManager game, QueueManager queue)
     {
         GameObject go = new GameObject("Estudiante_" + profile.shortName);
         go.transform.position = position;
+        go.transform.localScale = new Vector3(1.5f, 1.5f, 1f);
 
         Student s = go.AddComponent<Student>();
         s.SetupFromProfile(profile, game, queue);
@@ -90,6 +142,7 @@ public class Student : MonoBehaviour
         game = g;
         queue = q;
 
+        transform.localScale = new Vector3(1.5f, 1.5f, 1f);
         patienceMax = p.patience;
         patience = p.patience;
         studyMax = p.studyTime;
@@ -104,72 +157,92 @@ public class Student : MonoBehaviour
         missingCharge = false;
         chargePenalized = false;
         distracted = g != null && Random.value < g.DistractionChance;
+
+        LoadNPCSprites();
+        if (npcIndex < 0 || npcIndex >= 6)
+        {
+            npcIndex = Random.Range(0, 6);
+        }
+        if (frontSprites != null && frontSprites[npcIndex] != null) frontSprite = frontSprites[npcIndex];
+        if (backSprites != null && backSprites[npcIndex] != null) backSprite = backSprites[npcIndex];
+
         if (visual == null) BuildVisual();
         if (chargeRoot != null) chargeRoot.SetActive(needsCharge);
     }
 
     void BuildVisual()
     {
-        // Los estudiantes siempre dibujan por encima de las mesas (2-10) para que
-        // se vea claramente cuando estan sentados o siendo arrastrados.
-        SortingGroup sorting = gameObject.AddComponent<SortingGroup>();
-        sorting.sortingOrder = 20;
+        LoadNPCSprites();
+        if (npcIndex < 0 || npcIndex >= 6)
+        {
+            npcIndex = Random.Range(0, 6);
+        }
+        if (frontSprite == null && frontSprites != null && frontSprites[npcIndex] != null)
+            frontSprite = frontSprites[npcIndex];
+        if (backSprite == null && backSprites != null && backSprites[npcIndex] != null)
+            backSprite = backSprites[npcIndex];
 
+        // Objeto Visual con UNICO SpriteRenderer en capa Default y material Sprite-Lit-Default
         GameObject v = new GameObject("Visual");
         v.transform.SetParent(transform, false);
         visual = v.transform;
 
-        Color c = profile.color;
+        body = visual.gameObject.AddComponent<SpriteRenderer>();
+        body.sprite = frontSprite;
+        body.sortingLayerName = "Default";
+        body.sortingOrder = 20;
+
+        Material litMat = GetLitMaterial();
+        if (litMat != null) body.sharedMaterial = litMat;
+
+        // Objeto FloatingUI para datos flotantes en Sorting Layer "UI" (aislado de iluminacion 2D)
+        GameObject fui = new GameObject("FloatingUI");
+        fui.transform.SetParent(transform, false);
+        floatingUI = fui.transform;
+
         Color dark = new Color(0.05f, 0.06f, 0.09f, 1f);
-        Color light = new Color(Mathf.Min(1f, c.r * 1.25f), Mathf.Min(1f, c.g * 1.25f), Mathf.Min(1f, c.b * 1.25f));
-
-        PixelFactory.Quad("Sombra", visual, new Vector3(0f, -0.34f, 0f), new Vector2(0.66f, 0.16f), new Color(0f, 0f, 0f, 0.35f), 9);
-        PixelFactory.Quad("Borde", visual, new Vector3(0f, -0.02f, 0f), new Vector2(0.70f, 0.70f), dark, 10);
-        body = PixelFactory.Quad("Cuerpo", visual, new Vector3(0f, -0.02f, 0f), new Vector2(0.61f, 0.61f), c, 11);
-        head = PixelFactory.Quad("Cabeza", visual, new Vector3(0f, 0.42f, 0f), new Vector2(0.34f, 0.34f), light, 12);
-        PixelFactory.Quad("OjoIzq", visual, new Vector3(-0.07f, 0.44f, 0f), new Vector2(0.05f, 0.07f), dark, 13);
-        PixelFactory.Quad("OjoDer", visual, new Vector3(0.07f, 0.44f, 0f), new Vector2(0.05f, 0.07f), dark, 13);
-
-        // Franjas de identificacion rapida por carrera (ademas del color).
-        int stripes = ((int)profile.career % 3) + 1;
-        for (int i = 0; i < stripes; i++)
-        {
-            PixelFactory.Quad("Franja" + (i + 1), visual,
-                new Vector3(0f, 0.16f - i * 0.13f, 0f), new Vector2(0.46f, 0.045f),
-                new Color(1f, 1f, 1f, 0.55f), 12);
-        }
-
         BuildCareerLabel(dark);
 
         // Barra de paciencia / estudio
-        PixelFactory.Quad("BarraFondo", visual, new Vector3(0f, 0.78f, 0f), new Vector2(0.82f, 0.13f), new Color(0.05f, 0.06f, 0.09f, 0.95f), 14);
-        barBg = PixelFactory.Quad("BarraInterior", visual, new Vector3(0f, 0.78f, 0f), new Vector2(0.76f, 0.08f), new Color(0.18f, 0.20f, 0.26f), 15);
-        barFill = PixelFactory.Quad("BarraFill", visual, new Vector3(0f, 0.78f, 0f), new Vector2(0.76f, 0.08f), new Color(0.35f, 0.9f, 0.45f), 16);
+        SpriteRenderer bFondo = PixelFactory.Quad("BarraFondo", floatingUI, new Vector3(0f, 0.78f, 0f), new Vector2(0.82f, 0.13f), new Color(0.05f, 0.06f, 0.09f, 0.95f), 101);
+        barBg = PixelFactory.Quad("BarraInterior", floatingUI, new Vector3(0f, 0.78f, 0f), new Vector2(0.76f, 0.08f), new Color(0.18f, 0.20f, 0.26f), 102);
+        barFill = PixelFactory.Quad("BarraFill", floatingUI, new Vector3(0f, 0.78f, 0f), new Vector2(0.76f, 0.08f), new Color(0.35f, 0.9f, 0.45f), 103);
+
+        SetupFloatingRenderer(bFondo, 101);
+        SetupFloatingRenderer(barBg, 102);
+        SetupFloatingRenderer(barFill, 103);
 
         // Marcas de estado
-        alertBox = PixelFactory.Quad("Alerta", visual, new Vector3(0f, 1.04f, 0f), new Vector2(0.22f, 0.22f), new Color(1f, 0.85f, 0.25f), 17);
+        alertBox = PixelFactory.Quad("Alerta", floatingUI, new Vector3(0f, 1.04f, 0f), new Vector2(0.22f, 0.22f), new Color(1f, 0.85f, 0.25f), 105);
+        SetupFloatingRenderer(alertBox, 105);
         alertBox.gameObject.SetActive(false);
 
-        readyBox = PixelFactory.Quad("Listo", visual, new Vector3(0f, 1.04f, 0f), new Vector2(0.24f, 0.24f), new Color(0.35f, 1f, 0.55f), 17);
+        readyBox = PixelFactory.Quad("Listo", floatingUI, new Vector3(0f, 1.04f, 0f), new Vector2(0.24f, 0.24f), new Color(0.35f, 1f, 0.55f), 105);
+        SetupFloatingRenderer(readyBox, 105);
         readyBox.gameObject.SetActive(false);
 
         // Aviso de pelea: la mesa tiene alumnos de otra carrera.
-        conflictBox = PixelFactory.Quad("Pelea", visual, new Vector3(0.30f, 0.24f, 0f), new Vector2(0.17f, 0.17f),
-            new Color(1f, 0.25f, 0.25f), 13);
+        conflictBox = PixelFactory.Quad("Pelea", floatingUI, new Vector3(0.30f, 0.24f, 0f), new Vector2(0.17f, 0.17f),
+            new Color(1f, 0.25f, 0.25f), 105);
+        SetupFloatingRenderer(conflictBox, 105);
         conflictBox.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
         conflictBox.gameObject.SetActive(false);
 
         // Bateria baja: icono amarillo que avisa que necesita un enchufe.
         chargeRoot = new GameObject("Bateria");
-        chargeRoot.transform.SetParent(visual, false);
+        chargeRoot.transform.SetParent(floatingUI, false);
         chargeRoot.transform.localPosition = new Vector3(-0.30f, 0.36f, 0f);
 
         chargeBody = PixelFactory.Quad("BateriaCuerpo", chargeRoot.transform, Vector3.zero,
-            new Vector2(0.13f, 0.19f), new Color(1f, 0.86f, 0.30f), 14);
-        PixelFactory.Quad("BateriaTip", chargeRoot.transform, new Vector3(0f, 0.12f, 0f),
-            new Vector2(0.06f, 0.05f), new Color(1f, 0.86f, 0.30f), 14);
-        PixelFactory.Quad("BateriaRayo", chargeRoot.transform, new Vector3(0f, 0f, 0f),
-            new Vector2(0.035f, 0.10f), new Color(0.25f, 0.22f, 0.10f), 15);
+            new Vector2(0.13f, 0.19f), new Color(1f, 0.86f, 0.30f), 104);
+        SpriteRenderer bTip = PixelFactory.Quad("BateriaTip", chargeRoot.transform, new Vector3(0f, 0.12f, 0f),
+            new Vector2(0.06f, 0.05f), new Color(1f, 0.86f, 0.30f), 104);
+        SpriteRenderer bRay = PixelFactory.Quad("BateriaRayo", chargeRoot.transform, new Vector3(0f, 0f, 0f),
+            new Vector2(0.035f, 0.10f), new Color(0.25f, 0.22f, 0.10f), 105);
+
+        SetupFloatingRenderer(chargeBody, 104);
+        SetupFloatingRenderer(bTip, 104);
+        SetupFloatingRenderer(bRay, 105);
         chargeRoot.SetActive(false);
 
         BoxCollider2D box = gameObject.AddComponent<BoxCollider2D>();
@@ -178,19 +251,29 @@ public class Student : MonoBehaviour
         col = box;
     }
 
+    void SetupFloatingRenderer(SpriteRenderer sr, int order)
+    {
+        if (sr == null) return;
+        sr.sortingLayerName = "UI";
+        sr.sortingOrder = order;
+        Material unlit = GetUnlitMaterial();
+        if (unlit != null) sr.sharedMaterial = unlit;
+    }
+
     void BuildCareerLabel(Color dark)
     {
         GameObject labelGO = new GameObject("Carrera");
-        labelGO.transform.SetParent(visual, false);
-        labelGO.transform.localPosition = new Vector3(0f, -0.02f, 0f);
+        labelGO.transform.SetParent(floatingUI != null ? floatingUI : transform, false);
+        labelGO.transform.localPosition = new Vector3(1f, 0.75f, 0f);
 
         careerLabel = labelGO.AddComponent<TextMesh>();
         careerLabel.text = profile.shortName;
         careerLabel.anchor = TextAnchor.MiddleCenter;
         careerLabel.alignment = TextAlignment.Center;
         careerLabel.fontSize = 64;
-        careerLabel.characterSize = 0.075f;
-        careerLabel.color = new Color(0.05f, 0.06f, 0.09f, 0.88f);
+        careerLabel.characterSize = 0.06f;
+        careerLabel.fontStyle = FontStyle.Bold;
+        careerLabel.color = new Color(1f, 1f, 1f, 0.25f);
 
         Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
@@ -201,8 +284,47 @@ public class Student : MonoBehaviour
             if (mr != null)
             {
                 mr.sharedMaterial = font.material;
-                mr.sortingOrder = 18;
+                mr.sortingLayerName = "UI";
+                mr.sortingOrder = 106;
             }
+        }
+    }
+
+    public void ApplySeatedVisuals()
+    {
+        if (body != null)
+        {
+            body.sprite = backSprite;
+            body.sortingLayerName = "Default";
+            body.sortingOrder = 1;
+        }
+        if (visual != null)
+        {
+            visual.localPosition = new Vector3(0f, 0.18f, 0f);
+            visual.localScale = Vector3.one;
+        }
+        if (floatingUI != null)
+        {
+            floatingUI.localPosition = new Vector3(0f, 0.18f, 0f);
+        }
+    }
+
+    public void ApplyStandingVisuals(int sortingOrder = 20)
+    {
+        if (body != null)
+        {
+            body.sprite = frontSprite;
+            body.sortingLayerName = "Default";
+            body.sortingOrder = sortingOrder;
+        }
+        if (visual != null)
+        {
+            visual.localPosition = Vector3.zero;
+            visual.localScale = Vector3.one;
+        }
+        if (floatingUI != null)
+        {
+            floatingUI.localPosition = Vector3.zero;
         }
     }
 
@@ -244,8 +366,67 @@ public class Student : MonoBehaviour
                 break;
         }
 
+        // Animacion de caminado procedural: mientras se este moviendo, oscila localScale.y entre 1.0 y 1.1
+        if (mover != null)
+        {
+            float step = Mathf.Lerp(1.0f, 1.1f, (Mathf.Sin(Time.time * 16f) + 1f) * 0.5f);
+            if (visual != null) visual.localScale = new Vector3(1f, step, 1f);
+        }
+        else if (state != StudentState.Leaving)
+        {
+            if (visual != null) visual.localScale = Vector3.one;
+        }
+
         UpdateBar();
         UpdateIdle();
+        CheckHoverFallback();
+    }
+
+    bool isHovered;
+
+    void OnMouseEnter()
+    {
+        SetHover(true);
+    }
+
+    void OnMouseExit()
+    {
+        SetHover(false);
+    }
+
+    public void SetHover(bool hover)
+    {
+        isHovered = hover;
+        UpdateCareerAlpha();
+    }
+
+    void UpdateCareerAlpha()
+    {
+        if (careerLabel != null)
+        {
+            Color c = careerLabel.color;
+            c.r = 1f;
+            c.g = 1f;
+            c.b = 1f;
+            c.a = isHovered ? 1.0f : 0.25f;
+            careerLabel.color = c;
+        }
+    }
+
+    void CheckHoverFallback()
+    {
+        if (state == StudentState.Gone || state == StudentState.Leaving || state == StudentState.Dragging) return;
+        if (col == null || Camera.main == null) return;
+        if (Mouse.current == null) return;
+
+        Vector2 mousePos = Mouse.current.position.ReadValue();
+        Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(mousePos);
+        mouseWorld.z = 0f;
+        bool contains = col.OverlapPoint(mouseWorld);
+        if (contains != isHovered)
+        {
+            SetHover(contains);
+        }
     }
 
     void TickPatience(float dt)
@@ -406,7 +587,10 @@ public class Student : MonoBehaviour
         if (urgent)
             visual.localPosition = new Vector3(Mathf.Sin(Time.time * 45f) * 0.035f, visual.localPosition.y, 0f);
         else if (state != StudentState.InQueue)
-            visual.localPosition = new Vector3(0f, visual.localPosition.y, 0f);
+        {
+            float targetY = (state == StudentState.Seated || state == StudentState.Ready || state == StudentState.Packing) ? 0.18f : 0f;
+            visual.localPosition = new Vector3(0f, targetY, 0f);
+        }
 
         if (needsAttention && alertBox != null)
         {
@@ -447,10 +631,10 @@ public class Student : MonoBehaviour
             StopCoroutine(mover);
             mover = null;
         }
-
         state = StudentState.Dragging;
         transform.SetParent(null);
         if (col != null) col.enabled = false;
+        ApplyStandingVisuals(60);
         game.SetDragOrder(this, true);
         AudioManager.Play(Sfx.Pickup, 0.8f, UnityEngine.Random.Range(0.96f, 1.05f));
     }
@@ -459,7 +643,9 @@ public class Student : MonoBehaviour
     {
         state = StudentState.InQueue;
         if (col != null) col.enabled = true;
+        ApplyStandingVisuals(20);
         game.SetDragOrder(this, false);
+        SetHover(false);
         WalkTo(queuePosition, 12f);
     }
 
@@ -467,7 +653,9 @@ public class Student : MonoBehaviour
     {
         state = StudentState.Seated;
         if (col != null) col.enabled = true;
+        ApplyStandingVisuals(20);
         game.SetDragOrder(this, false);
+        SetHover(false);
         if (seat != null) WalkTo(seat.SpotPosition(Mathf.Max(0, seat.occupants.IndexOf(this))), 12f);
     }
 
@@ -493,7 +681,9 @@ public class Student : MonoBehaviour
         if (conflictBox != null) conflictBox.gameObject.SetActive(careerConflict);
         if (readyBox != null) readyBox.gameObject.SetActive(false);
         if (col != null) col.enabled = true;
+        ApplyStandingVisuals(20);
         game.SetDragOrder(this, false);
+        SetHover(false);
 
         // Camina rapido a su sitio: el turno ahora es mas agil.
         WalkTo(s.SpotPosition(idx), 11f);
@@ -568,6 +758,7 @@ public class Student : MonoBehaviour
 
     IEnumerator ExitRoutine(Color flash)
     {
+        ApplyStandingVisuals(20);
         if (body != null) body.color = flash;
         Vector3 door = game != null ? game.DoorPosition : transform.position + Vector3.down * 3f;
 
@@ -575,6 +766,8 @@ public class Student : MonoBehaviour
         while (t < 1.2f)
         {
             t += Time.deltaTime;
+            float step = Mathf.Lerp(1.0f, 1.1f, (Mathf.Sin(Time.time * 16f) + 1f) * 0.5f);
+            if (visual != null) visual.localScale = new Vector3(1f, step, 1f);
             transform.position = Vector3.MoveTowards(transform.position, door, 8f * Time.deltaTime);
             if (body != null)
             {
@@ -605,5 +798,15 @@ public class Student : MonoBehaviour
         }
         transform.position = target;
         mover = null;
+        if (visual != null) visual.localScale = Vector3.one;
+
+        if (state == StudentState.Seated)
+        {
+            ApplySeatedVisuals();
+        }
+        else
+        {
+            ApplyStandingVisuals(state == StudentState.Dragging ? 60 : 20);
+        }
     }
 }
