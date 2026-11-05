@@ -264,14 +264,14 @@ public class Student : MonoBehaviour
     {
         GameObject labelGO = new GameObject("Carrera");
         labelGO.transform.SetParent(floatingUI != null ? floatingUI : transform, false);
-        labelGO.transform.localPosition = new Vector3(1f, 0.75f, 0f);
+        labelGO.transform.localPosition = new Vector3(0.02f, 0.55f, 0f);
 
         careerLabel = labelGO.AddComponent<TextMesh>();
         careerLabel.text = profile.shortName;
         careerLabel.anchor = TextAnchor.MiddleCenter;
         careerLabel.alignment = TextAlignment.Center;
         careerLabel.fontSize = 64;
-        careerLabel.characterSize = 0.06f;
+        careerLabel.characterSize = 0.04f;
         careerLabel.fontStyle = FontStyle.Bold;
         careerLabel.color = new Color(1f, 1f, 1f, 0.25f);
 
