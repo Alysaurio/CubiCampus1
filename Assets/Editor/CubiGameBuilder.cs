@@ -22,7 +22,7 @@ public static class CubiGameBuilder
     static readonly Color ColZonaSil    = new Color(0.11f, 0.20f, 0.32f, 0.55f);
     static readonly Color ColZonaDob    = new Color(0.10f, 0.22f, 0.18f, 0.55f);
     static readonly Color ColZonaRui    = new Color(0.26f, 0.16f, 0.09f, 0.55f);
-    static readonly Color ColFila       = new Color(0.10f, 0.12f, 0.18f, 0.85f);
+    static readonly Color ColFila       = new Color(0.10f, 0.12f, 0.18f, 0.25f);
     static readonly Color ColTexto      = new Color(0.95f, 0.95f, 0.98f, 1f);
     static readonly Color ColTextoTenue = new Color(0.68f, 0.72f, 0.82f, 1f);
     static readonly Color ColBotonAzul  = new Color(0.20f, 0.55f, 0.95f, 1f);
@@ -310,13 +310,13 @@ public static class CubiGameBuilder
     {
         if (GameObject.Find("MesaProfesor") == null)
         {
-            NewSprite("MesaProfesor", parent, new Vector3(4f, -3f, 0f), new Vector2(2.75f, 1.0f),
+            NewSprite("MesaProfesor", parent, new Vector3(2.4f, 2.7f, 0f), new Vector2(2.75f, 1.0f),
                 new Color(0.36f, 0.24f, 0.14f), 2);
         }
 
         if (GameObject.Find("Profesor") == null)
         {
-            NewSprite("Profesor", parent, new Vector3(4f, -2.4f, 0f), new Vector2(0.7f, 0.7f),
+            NewSprite("Profesor", parent, new Vector3(3.75f, 2.7f, 0f), new Vector2(0.7f, 0.7f),
                 new Color(0.25f, 0.55f, 0.85f), 14);
         }
     }

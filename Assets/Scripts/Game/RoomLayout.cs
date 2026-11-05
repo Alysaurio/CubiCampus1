@@ -70,6 +70,13 @@ public static class RoomLayout
         Hide("Estanteria2");
         Hide("Puerta");
         Hide("PuertaLuz");
+
+        GameObject zf = GameObject.Find("ZonaFila");
+        if (zf != null)
+        {
+            var srZf = zf.GetComponent<SpriteRenderer>();
+            if (srZf != null) { Color c = srZf.color; c.a = 0.25f; srZf.color = c; }
+        }
     }
 
     static void Move(string name, Vector3 pos, Vector2 size)
@@ -158,23 +165,12 @@ public static class RoomLayout
 
     static void PositionSeats(GameManager game)
     {
+        int active = (game != null && game.configDia != null) ? game.configDia.activeSeats : TotalTables;
         for (int i = 0; i < game.seats.Count && i < TotalTables; i++)
         {
             Seat s = game.seats[i];
             if (s == null) continue;
-
-            int row = i / TablesPerRow;
-            int col = i % TablesPerRow;
-
-            Vector3 pos = new Vector3(
-                GridStartX + col * ColumnStep,
-                GridStartY - row * RowStep,
-                0f);
-            if (Mathf.Abs(pos.x - 4.0f) < 2.0f && Mathf.Abs(pos.y - (-3.0f)) < 1.6f)
-            {
-                pos.x += 2.5f;
-            }
-            s.transform.position = pos;
+            s.transform.position = ClassroomEnvironmentGenerator.GetDeskPosition(i, active);
         }
     }
 
@@ -549,7 +545,7 @@ public static class RoomLayout
             sr.sprite = PixelFactory.White;
             sr.color = new Color(0.36f, 0.24f, 0.14f);
             sr.sortingOrder = 2;
-            desk.transform.position = new Vector3(4f, -3f, 0f);
+            desk.transform.position = new Vector3(2.4f, 2.7f, 0f);
             desk.transform.localScale = new Vector3(2.75f, 1.0f, 1f);
         }
 
@@ -561,7 +557,7 @@ public static class RoomLayout
             sr.sprite = PixelFactory.White;
             sr.color = new Color(0.25f, 0.55f, 0.85f);
             sr.sortingOrder = 14;
-            teacher.transform.position = new Vector3(4f, -2.4f, 0f);
+            teacher.transform.position = new Vector3(3.75f, 2.7f, 0f);
             teacher.transform.localScale = new Vector3(0.7f, 0.7f, 1f);
         }
     }

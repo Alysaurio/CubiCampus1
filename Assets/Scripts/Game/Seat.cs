@@ -240,11 +240,18 @@ public class Seat : MonoBehaviour
 
         groupRoot.gameObject.SetActive(true);
         Color c = StudentProfile.ColorOf(career);
-        if (groupBand != null) groupBand.color = c;
+        c.a = 0.75f;
+        if (groupBand != null)
+        {
+            groupBand.color = c;
+            groupBand.transform.localScale = new Vector3(1.8f, 0.3f, 1f);
+        }
+        if (groupLabel != null) groupLabel.fontStyle = FontStyle.Bold;
         if (groupLabel != null)
         {
             groupLabel.text = StudentProfile.ShortCode(career);
             groupLabel.color = new Color(0.06f, 0.07f, 0.10f, 0.95f);
+        groupLabel.fontStyle = FontStyle.Bold;
         }
         RefreshVisual();
     }
@@ -257,8 +264,9 @@ public class Seat : MonoBehaviour
 
         float y = size.y * 0.5f - 0.13f;
         groupBand = PixelFactory.Quad("GrupoFranja", groupRoot,
-            new Vector3(0f, y, 0f), new Vector2(size.x * 0.96f, 0.20f),
-            new Color(1f, 1f, 1f, 0.95f), 5);
+            new Vector3(0f, y, 0f), new Vector2(1.8f, 0.3f),
+            new Color(1f, 1f, 1f, 0.75f), 5);
+        groupBand.transform.localScale = new Vector3(1.8f, 0.3f, 1f);
 
         GameObject labelGO = new GameObject("GrupoTexto");
         labelGO.transform.SetParent(groupRoot, false);
@@ -270,6 +278,7 @@ public class Seat : MonoBehaviour
         groupLabel.fontSize = 64;
         groupLabel.characterSize = 0.055f;
         groupLabel.color = new Color(0.06f, 0.07f, 0.10f, 0.95f);
+        groupLabel.fontStyle = FontStyle.Bold;
 
         Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
@@ -578,7 +587,7 @@ public class Seat : MonoBehaviour
     public float SpotOffsetX(int index)
     {
         if (capacity <= 1) return 0f;
-        float step = size.x * 0.27f;
+        float step = 0.5f;
         return index <= 0 ? -step : step;
     }
 
