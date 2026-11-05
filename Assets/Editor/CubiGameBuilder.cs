@@ -140,7 +140,9 @@ public static class CubiGameBuilder
         canvas.renderMode = RenderMode.ScreenSpaceCamera;
         canvas.worldCamera = cam;
         canvas.planeDistance = 10f;
-        canvas.sortingOrder = 100;
+        canvas.sortingLayerName = "UI";
+        // Por encima de las etiquetas flotantes de los alumnos (orden 101-106).
+        canvas.sortingOrder = 200;
 
         CanvasScaler scaler = canvasGO.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -253,7 +255,7 @@ public static class CubiGameBuilder
         // Panel de pausa
         GameObject panelPausa = NewUI("PanelPausa", canvasT);
         Stretch(panelPausa.GetComponent<RectTransform>());
-        AddImage(panelPausa, new Color(0f, 0f, 0f, 0.78f));
+        AddImage(panelPausa, new Color(0f, 0f, 0f, 0.90f));
 
         GameObject contPausa = NewUI("ContenedorPausa", panelPausa.transform);
         Place(contPausa.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760f, 560f));

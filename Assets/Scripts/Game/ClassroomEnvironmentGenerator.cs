@@ -460,6 +460,11 @@ public class ClassroomEnvironmentGenerator : MonoBehaviour
             {
                 teacherT.gameObject.AddComponent<TeacherIdleAnimation>();
             }
+            if (teacherT.GetComponent<ProfeDialogue>() == null)
+            {
+                ProfeDialogue dialogo = teacherT.gameObject.AddComponent<ProfeDialogue>();
+                dialogo.profe = teacherT;
+            }
         }
     }
 
